@@ -1,0 +1,11 @@
+class HybridEncryptionError(Exception):
+    """Custom exception for JWE-related errors."""
+
+    def __init__(self, message, error_code=None, function_name=None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.message = message
+        self.function_name = function_name
+
+    def __str__(self):
+        return f"{self.error_code} - {self.message} (Function: {self.function_name})"

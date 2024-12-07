@@ -1,0 +1,90 @@
+import json
+
+from jwcrypto import jwk, jwe
+
+from Cryptorix.jwe.exceptions import JWEError
+from Cryptorix.logger import logger
+from Cryptorix.secrets.manager import get_rsa_key
+
+# Encryption and decryption algorithms
+ALGORITHM_KEY_ENC = "RSA-OAEP-256"
+ALGORITHM_CONTENT_ENC = "A256GCM"
+
+
+def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) -> str:
+    """
+    Encrypt a dictionary into a JWE token using a public RSA key.
+
+    Args:
+        api_response (str): The plaintext data to encrypt.
+        secret_name (str): Identifier for the RSA key pair.
+        secret_key (str): Identifier for the RSA key pair secret.
+        kms_id (str): Unique identifier for the Key Management System.
+
+    Returns:
+        str: Compact serialized JWE token as a string
+
+    Raises:
+        JWEError: If encryption fails due to any exception.
+    """
+    try:
+        # Fetch the RSA public key in PEM format
+        public_key_pem = get_rsa_key(secret_name, secret_key, kms_id)
+        public_key = jwk.JWK.from_pem(public_key_pem.encode("utf-8"))
+
+        # Prepare the JWE object with the given payload and encryption details
+        jwe_token = jwe.JWE(
+            plaintext=json.dumps(api_response).encode("utf-8"),
+            recipient=public_key,
+            protected={"alg": ALGORITHM_KEY_ENC, "enc": ALGORITHM_CONTENT_ENC}
+        )
+
+        # Serialize the JWE object in compact format
+        return jwe_token.serialize(compact=True)
+
+    except Exception as error:
+        # Log and raise a specific JWE error for failure
+        logger.exception(f"JWE encryption failed for KMS ID '{kms_id}': {error}")
+        raise JWEError(
+            message=f"Failed to encrypt the response: {error}",
+            error_code="ENCRYPTION_FAILED",
+            function_name="encrypt"
+        )
+
+
+def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) -> dict:
+    """
+    Decrypt a JWE token into a dictionary using a private RSA key.
+
+    Args:
+        jwe_payload (str): Compact serialized JWE token to decrypt.
+        secret_name (str): Identifier for the RSA key pair.
+        secret_key (str): Identifier for the RSA key pair secret.
+        kms_id (str): Unique identifier for the Key Management System.
+
+    Returns:
+        dict: Decrypted dictionary payload
+
+    Raises:
+        JWEError: If encryption fails due to any exception.
+    """
+    try:
+        # Fetch the RSA private key in PEM format
+        private_key_pem = get_rsa_key(secret_name, secret_key, kms_id)
+        private_key = jwk.JWK.from_pem(private_key_pem.encode("utf-8"))
+
+        # Deserialize the JWE token and decrypt using the private key
+        jwe_token = jwe.JWE()
+        jwe_token.deserialize(jwe_payload, key=private_key)
+
+        # Decode and parse the payload into a dictionary
+        return json.loads(jwe_token.payload.decode("utf-8"))
+
+    except Exception as error:
+        # Log and raise a specific JWE error for failure
+        logger.exception(f"JWE decryption failed for KMS ID '{kms_id}': {error}")
+        raise JWEError(
+            message=f"Failed to decrypt the payload: {error}",
+            error_code="DECRYPTION_FAILED",
+            function_name="decrypt"
+        )
