@@ -7,7 +7,6 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
 from Cryptorix.hybrid_encryption.exceptions import HybridEncryptionError
-from Cryptorix.logger import logger
 from Cryptorix.secrets.manager import get_rsa_key
 
 
@@ -48,13 +47,14 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) 
             "encryptedKey": base64.b64encode(enc_aes_key).decode("utf-8")
         }
     except Exception as error:
-        # Log the error and raise a custom exception with details
-        logger.exception(f"Encryption failed for KMS ID '{kms_id}': {error}")
         raise HybridEncryptionError(
-            message=f"Failed to encrypt the response: {str(error)}",
+            error=str(error),
             error_code="ENCRYPTION_FAILED",
-            function_name="encrypt_data"
-        )
+            function_name="encrypt",
+            context={
+                "secret_name": secret_name, "kms_id": kms_id
+            }
+        ) from error
 
 
 def decrypt(
@@ -103,10 +103,13 @@ def decrypt(
         # Parse and return the plaintext as a JSON object
         return json.loads(plaintext.decode("utf-8"))
     except Exception as error:
-        # Log the error and raise a custom exception with details
-        logger.exception(f"Decryption failed for KMS ID '{kms_id}': {error}")
         raise HybridEncryptionError(
-            message=f"Failed to decrypt the payload: {str(error)}",
+            error=str(error),
             error_code="DECRYPTION_FAILED",
-            function_name="decrypt_data"
-        )
+            function_name="decrypt",
+            context={
+                "secret_name": secret_name,
+                "kms_id": kms_id,
+                "encrypted_data_snippet": encrypted_data[:30] + "..."
+            }
+        ) from error

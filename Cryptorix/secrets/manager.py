@@ -6,7 +6,6 @@ from typing import Dict
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from Cryptorix.logger import logger
 from Cryptorix.secrets.exceptions import SecretRetrievalError, KMSDecryptionError
 
 # Set default AWS region, falling back to "ap-south-1" if not set
@@ -30,8 +29,8 @@ def get_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
         str: The decrypted RSA key as a plaintext string.
 
     Raises:
-        SecretRetrievalError: If secret retrieval or decryption fails.
-        InterruptedError: If a specific retrieval or decryption error occurs.
+        SecretRetrievalError: If secret retrieval fails.
+        KMSDecryptionError: If KMS decryption fails.
     """
     try:
         # Retrieve the secret dictionary from Secrets Manager
@@ -41,9 +40,10 @@ def get_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
         ciphertext = secret_dict.get(secret_key)
         if not ciphertext:
             raise SecretRetrievalError(
-                message=f"Key '{secret_key}' not found in the secret '{secret_name}'.",
+                error=f"Key '{secret_key}' not found in the secret '{secret_name}'.",
                 error_code="KEY_NOT_FOUND",
-                function_name="get_rsa_key"
+                function_name="get_rsa_key",
+                context={"secret_name": secret_name, "secret_key": secret_key}
             )
 
         # Decrypt the ciphertext using AWS KMS
@@ -52,17 +52,12 @@ def get_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
 
     except (SecretRetrievalError, KMSDecryptionError) as specific_error:
         # Log and re-raise specific errors for diagnostics
-        logger.error(f"Specific error in get_rsa_key: {specific_error}")
-        raise InterruptedError(specific_error)
-
-    except Exception as error:
-        # Log and re-raise unexpected exceptions as SecretRetrievalError
-        logger.exception(f"Unexpected error in get_rsa_key: {error}")
         raise SecretRetrievalError(
-            message="Unexpected error occurred during RSA key retrieval.",
-            error_code="UNEXPECTED_ERROR",
-            function_name="get_rsa_key"
-        )
+            error=str(specific_error),
+            error_code="SECRET_OPERATION_FAILED",
+            function_name="get_rsa_key",
+            context={"secret_name": secret_name, "secret_key": secret_key, "kms_id": kms_id}
+        ) from specific_error
 
 
 def get_secrets(secret_name: str, secret_key: str) -> Dict[str, str]:
@@ -89,9 +84,10 @@ def get_secrets(secret_name: str, secret_key: str) -> Dict[str, str]:
         # Ensure the secret string is not empty
         if not secret_string:
             raise SecretRetrievalError(
-                message=f"The secret '{secret_name}' is empty or malformed.",
+                error=f"The secret '{secret_name}' is empty or malformed.",
                 error_code="EMPTY_SECRET",
-                function_name="get_secrets"
+                function_name="get_secrets",
+                context={"secret_name": secret_name}
             )
 
         # Parse the secret string as JSON
@@ -100,31 +96,29 @@ def get_secrets(secret_name: str, secret_key: str) -> Dict[str, str]:
         # Ensure the desired key is present in the parsed secret
         if secret_key not in secret_dict:
             raise SecretRetrievalError(
-                message=f"Key '{secret_key}' not found in secret '{secret_name}'.",
+                error=f"Key '{secret_key}' not found in secret '{secret_name}'.",
                 error_code="KEY_NOT_PRESENT",
-                function_name="get_secrets"
+                function_name="get_secrets",
+                context={"secret_name": secret_name, "secret_key": secret_key}
             )
 
         # Return the full parsed secret as a dictionary
         return secret_dict
 
     except (ClientError, BotoCoreError) as aws_error:
-        # Handle AWS-related exceptions
-        logger.error(f"Error accessing Secrets Manager for '{secret_name}': {aws_error}")
         raise SecretRetrievalError(
-            message=f"Error accessing AWS Secrets Manager: {aws_error}",
+            error=str(aws_error),
             error_code="SECRET_RETRIEVAL_FAILED",
-            function_name="get_secrets"
-        )
-
+            function_name="get_secrets",
+            context={"secret_name": secret_name, "secret_key": secret_key}
+        ) from aws_error
     except json.JSONDecodeError as json_error:
-        # Handle JSON parsing exceptions
-        logger.error(f"Failed to parse secret JSON for '{secret_name}': {json_error}")
         raise SecretRetrievalError(
-            message=f"Error decoding secret JSON: {json_error}",
+            error=str(json_error),
             error_code="JSON_DECODE_ERROR",
-            function_name="get_secrets"
-        )
+            function_name="get_secrets",
+            context={"secret_name": secret_name}
+        ) from json_error
 
 
 def decrypt_kms_ciphertext(kms_id: str, ciphertext: str) -> str:
@@ -139,7 +133,7 @@ def decrypt_kms_ciphertext(kms_id: str, ciphertext: str) -> str:
         str: Decrypted plaintext string.
 
     Raises:
-        KMSDecryptionError: If decryption fails due to AWS errors or unexpected issues.
+        KMSDecryptionError: If decryption fails.
     """
     try:
         # Decode the ciphertext from Base64 format
@@ -153,19 +147,16 @@ def decrypt_kms_ciphertext(kms_id: str, ciphertext: str) -> str:
         return plaintext
 
     except (ClientError, BotoCoreError) as aws_error:
-        # Handle AWS-specific errors during decryption
-        logger.error(f"KMS decryption failed for KMS ID '{kms_id}': {aws_error}")
         raise KMSDecryptionError(
-            message=f"KMS decryption error: {aws_error}",
+            error=str(aws_error),
             error_code="KMS_DECRYPTION_FAILED",
-            function_name="decrypt_kms_ciphertext"
+            function_name="decrypt_kms_ciphertext",
+            context={"kms_id": kms_id, "ciphertext": ciphertext}
         )
-
     except Exception as error:
-        # Handle any unexpected errors
-        logger.exception(f"Unexpected error during KMS decryption for KMS ID '{kms_id}': {error}")
         raise KMSDecryptionError(
-            message="Unexpected error occurred during KMS decryption.",
-            error_code="UNEXPECTED_DECRYPTION_ERROR",
-            function_name="decrypt_kms_ciphertext"
+            error=str(error),
+            error_code="UNEXPECTED_ERROR",
+            function_name="decrypt_kms_ciphertext",
+            context={"kms_id": kms_id}
         )

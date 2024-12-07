@@ -3,7 +3,6 @@ import json
 from jwcrypto import jwk, jwe
 
 from Cryptorix.jwe.exceptions import JWEError
-from Cryptorix.logger import logger
 from Cryptorix.secrets.manager import get_rsa_key
 
 # Encryption and decryption algorithms
@@ -44,12 +43,12 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) 
 
     except Exception as error:
         # Log and raise a specific JWE error for failure
-        logger.exception(f"JWE encryption failed for KMS ID '{kms_id}': {error}")
         raise JWEError(
-            message=f"Failed to encrypt the response: {error}",
+            error=str(error),
             error_code="ENCRYPTION_FAILED",
-            function_name="encrypt"
-        )
+            function_name="encrypt",
+            context={"secret_name": secret_name, "kms_id": kms_id},
+        ) from error
 
 
 def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) -> dict:
@@ -82,9 +81,13 @@ def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) ->
 
     except Exception as error:
         # Log and raise a specific JWE error for failure
-        logger.exception(f"JWE decryption failed for KMS ID '{kms_id}': {error}")
         raise JWEError(
-            message=f"Failed to decrypt the payload: {error}",
+            error=str(error),
             error_code="DECRYPTION_FAILED",
-            function_name="decrypt"
-        )
+            function_name="decrypt",
+            context={
+                "secret_name": secret_name,
+                "kms_id": kms_id,
+                "jwe_payload": jwe_payload[:30] + "..."
+            },
+        ) from error

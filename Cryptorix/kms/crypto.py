@@ -5,7 +5,6 @@ from base64 import b64decode, b64encode
 import boto3
 
 from Cryptorix.kms.exceptions import KMSDecryptionError, KMSEncryptionError
-from Cryptorix.logger import logger
 
 # Set default AWS region, falling back to "ap-south-1" if not set
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
@@ -37,12 +36,11 @@ def encrypt(plaintext: str, kms_id: str) -> str:
         return ciphertext
 
     except Exception as error:
-        # Log the error and raise a custom encryption exception
-        logger.exception(f"KMS encryption failed for KMS ID '{kms_id}': {error}")
         raise KMSEncryptionError(
-            message="Failed to encrypt the plaintext.",
+            error=str(error),
             error_code="ENCRYPTION_ERROR",
-            function_name="encrypt"
+            function_name="encrypt",
+            context={"kms_id": kms_id}
         )
 
 
@@ -74,10 +72,9 @@ def decrypt(encrypted_value: str, lambda_function_name: str, kms_id: str) -> dic
         return decrypted_value
 
     except Exception as error:
-        # Log the error and raise a custom decryption exception
-        logger.exception(f"KMS decryption failed for KMS ID '{kms_id}': {error}")
         raise KMSDecryptionError(
-            message="Failed to decrypt the encrypted value.",
+            error=str(error),
             error_code="DECRYPTION_ERROR",
-            function_name="decrypt"
-        )
+            function_name="decrypt",
+            context={"kms_id": kms_id, "lambda_function_name": lambda_function_name}
+        ) from error

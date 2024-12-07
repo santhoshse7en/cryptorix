@@ -20,12 +20,12 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setuptools.setup(
     name="Cryptorix",
-    version="1.0.0",
+    version="1.0.1",
     author="M Santhosh Kumar",
     author_email="santhoshse7en@gmail.com",
     description=(
         "A Python package that provides robust encryption and decryption mechanisms, "
-        "utilizing hybrid encryption, JSON Web Encryption (JWE), AWS KMS, and AWS Secrets Manager. "
+        "utilizing JSON Web Encryption (JWE), Hybrid Encryption, AWS KMS, and AWS Secrets Manager. "
         "Ensure the confidentiality and integrity of your data, with secure management of "
         "encryption keys."
     ),
