@@ -46,15 +46,19 @@ combining RSA encryption for key management and AES-GCM encryption for content.
 
 ### Hybrid Encryption
 
-This module implements hybrid encryption using AES for data encryption and RSA for key encryption.
-The encrypted data is Base64-encoded for secure transmission.
+This module provides hybrid encryption functionality using AES for encrypting data and RSA for
+encrypting the AES session key. The encrypted data is Base64-encoded to ensure secure and safe
+transmission across communication channels.
 
 **Functions:**
 
-* `encrypt_data(api_response, secret_name, secret_key, kms_id)`: Encrypts data using AES-GCM for
-  encryption and RSA for encrypting the AES key.
-* `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id)`: Decrypts the
-  encrypted data using RSA and AES-GCM.
+* `encrypt_data(api_response, secret_name, secret_key, kms_id, rsa_padding)`: Encrypts the provided
+  data using a hybrid encryption scheme. AES (in either GCM or CBC mode) is used for data
+  encryption, while RSA encrypts the AES session key. The data is then Base64-encoded for
+  secure transmission.
+* `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)`:
+  Decrypts the provided Base64-encoded encrypted data using RSA to retrieve the AES session key
+  and AES-GCM/CBC for decrypting the actual data.
 
 ### KMS (Key Management System)
 
@@ -153,10 +157,11 @@ api_response = {"username": "admin", "password": "secure_password"}
 secret_name = "your_secret_name"
 secret_key = "your_secret_key"
 kms_id = "your_kms_key_id"
+rsa_padding = "your_padding_type"
 
 try:
     # Encrypt the data
-    result = encrypt(api_response, secret_name, secret_key, kms_id)
+    result = encrypt(api_response, secret_name, secret_key, kms_id, rsa_padding)
     print("Encrypted Data:", result["encryptedData"])
     print("Encrypted Key:", result["encryptedKey"])
 except Exception as e:
@@ -176,10 +181,11 @@ encrypted_key = "your_base64_encoded_encrypted_key"
 secret_name = "your_secret_name"
 secret_key = "your_secret_key"
 kms_id = "your_kms_key_id"
+rsa_padding = "your_padding_type"
 
 try:
     # Decrypt the data
-    decrypted_response = decrypt(encrypted_data, encrypted_key, secret_name, secret_key, kms_id)
+    decrypted_response = decrypt(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)
     print("Decrypted Response:", decrypted_response)
 except Exception as e:
     print(f"Error during decryption: {e}")
