@@ -3,14 +3,14 @@ import json
 from jwcrypto import jwk, jwe
 
 from Cryptorix.jwe.exceptions import JWEError
-from Cryptorix.secrets.manager import get_rsa_key
+from Cryptorix.secrets.manager import retrieve_decrypted_secret_key, retrieve_secret_key
 
 # Encryption and decryption algorithms
 ALGORITHM_KEY_ENC = "RSA-OAEP-256"
 ALGORITHM_CONTENT_ENC = "A256GCM"
 
 
-def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) -> str:
+def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str = None) -> str:
     """
     Encrypt a dictionary into a JWE token using a public RSA key.
 
@@ -18,7 +18,7 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) 
         api_response (str): The plaintext data to encrypt.
         secret_name (str): Identifier for the RSA key pair.
         secret_key (str): Identifier for the RSA key pair secret.
-        kms_id (str): Unique identifier for the Key Management System.
+        kms_id (str, optional): KMS unique identifier for decrypting the RSA key, if applicable.
 
     Returns:
         str: Compact serialized JWE token as a string
@@ -28,7 +28,7 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) 
     """
     try:
         # Fetch the RSA public key in PEM format
-        public_key_pem = get_rsa_key(secret_name, secret_key, kms_id)
+        public_key_pem = _load_rsa_key(secret_name, secret_key, kms_id)
         public_key = jwk.JWK.from_pem(public_key_pem.encode("utf-8"))
 
         # Prepare the JWE object with the given payload and encryption details
@@ -51,7 +51,7 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str) 
         ) from error
 
 
-def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) -> dict:
+def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str = None) -> dict:
     """
     Decrypt a JWE token into a dictionary using a private RSA key.
 
@@ -59,7 +59,7 @@ def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) ->
         jwe_payload (str): Compact serialized JWE token to decrypt.
         secret_name (str): Identifier for the RSA key pair.
         secret_key (str): Identifier for the RSA key pair secret.
-        kms_id (str): Unique identifier for the Key Management System.
+        kms_id (str, optional): KMS unique identifier for decrypting the RSA key, if applicable.
 
     Returns:
         dict: Decrypted dictionary payload
@@ -69,7 +69,7 @@ def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) ->
     """
     try:
         # Fetch the RSA private key in PEM format
-        private_key_pem = get_rsa_key(secret_name, secret_key, kms_id)
+        private_key_pem = _load_rsa_key(secret_name, secret_key, kms_id)
         private_key = jwk.JWK.from_pem(private_key_pem.encode("utf-8"))
 
         # Deserialize the JWE token and decrypt using the private key
@@ -88,6 +88,31 @@ def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str) ->
             context={
                 "secret_name": secret_name,
                 "kms_id": kms_id,
-                "jwe_payload": jwe_payload[:30] + "..."
+                "jwe_payload": jwe_payload[:30] + "..."  # Mask long values for logs
             },
+        ) from error
+
+
+def _load_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
+    """
+    Retrieves and validates the RSA key from a secrets' manager.
+
+    Args:
+        secret_name (str): RSA secret name.
+        secret_key (str): RSA key identifier.
+        kms_id (str): KMS ID.
+
+    Returns:
+        str: RSA key.
+    """
+    try:
+        if kms_id:
+            return retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)
+        else:
+            return retrieve_secret_key(secret_name, secret_key)
+    except Exception as error:
+        raise JWEError(
+            error="Invalid RSA key or failed fetch",
+            error_code="RSA_LOAD_ERROR",
+            context={"secret_name": secret_name, "kms_id": kms_id}
         ) from error

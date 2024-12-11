@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setuptools.setup(
     name="Cryptorix",
-    version="1.0.2",
+    version="1.0.3",
     author="M Santhosh Kumar",
     author_email="santhoshse7en@gmail.com",
     description=(

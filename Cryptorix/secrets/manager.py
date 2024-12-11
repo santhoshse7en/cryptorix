@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 from typing import Dict
@@ -6,7 +5,8 @@ from typing import Dict
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from Cryptorix.secrets.exceptions import SecretRetrievalError, KMSDecryptionError
+from Cryptorix.kms import decrypt
+from Cryptorix.secrets.exceptions import SecretRetrievalError
 
 # Set default AWS region, falling back to "ap-south-1" if not set
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
@@ -16,7 +16,56 @@ secret_manager_client = boto3.client(service_name="secretsmanager", region_name=
 kms_client = boto3.client(service_name="kms", region_name=REGION_NAME)
 
 
-def get_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
+def retrieve_secret_key(secret_name: str, secret_key: str) -> str:
+    """
+    Retrieve and decrypt a specific key from AWS Secrets Manager.
+
+    Args:
+        secret_name (str): The name or ARN of the secret in Secrets Manager.
+        secret_key (str): The key within the secret to retrieve.
+
+    Returns:
+        str: The decrypted RSA key as plaintext.
+
+    Raises:
+        SecretRetrievalError: If the secret retrieval or key extraction fails.
+    """
+    try:
+        # Fetch the secret dictionary from Secrets Manager
+        secret_dict = get_secrets(secret_name, secret_key)
+
+        # Retrieve the specified key's value
+        plain_text = secret_dict.get(secret_key)
+        if not plain_text:
+            raise SecretRetrievalError(
+                error=f"Key '{secret_key}' not found in secret '{secret_name}'.",
+                error_code="KEY_NOT_FOUND",
+                function_name="retrieve_secret_key",
+                context={"secret_name": secret_name, "secret_key": secret_key}
+            )
+
+        return plain_text
+
+    except SecretRetrievalError as error:
+        # Log and re-raise the SecretRetrievalError
+        raise SecretRetrievalError(
+            error=str(error),
+            error_code="SECRET_RETRIEVAL_FAILED",
+            function_name="retrieve_secret_key",
+            context={"secret_name": secret_name, "secret_key": secret_key}
+        ) from error
+
+    except Exception as error:
+        # Handle any unexpected exceptions
+        raise SecretRetrievalError(
+            error=f"Unexpected error occurred: {str(error)}",
+            error_code="UNEXPECTED_ERROR",
+            function_name="retrieve_secret_key",
+            context={"secret_name": secret_name, "secret_key": secret_key}
+        ) from error
+
+
+def retrieve_decrypted_secret_key(secret_name: str, secret_key: str, kms_id: str) -> str:
     """
     Retrieve and decrypt the RSA key from AWS Secrets Manager using KMS.
 
@@ -47,17 +96,16 @@ def get_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
             )
 
         # Decrypt the ciphertext using AWS KMS
-        rsa_key = decrypt_kms_ciphertext(kms_id, ciphertext)
+        rsa_key = decrypt(encrypted_value=ciphertext, kms_id=kms_id)
         return rsa_key
 
-    except (SecretRetrievalError, KMSDecryptionError) as specific_error:
-        # Log and re-raise specific errors for diagnostics
+    except Exception as error:
         raise SecretRetrievalError(
-            error=str(specific_error),
+            error=str(error),
             error_code="SECRET_OPERATION_FAILED",
-            function_name="get_rsa_key",
+            function_name="retrieve_decrypted_secret_key",
             context={"secret_name": secret_name, "secret_key": secret_key, "kms_id": kms_id}
-        ) from specific_error
+        ) from error
 
 
 def get_secrets(secret_name: str, secret_key: str) -> Dict[str, str]:
@@ -119,44 +167,3 @@ def get_secrets(secret_name: str, secret_key: str) -> Dict[str, str]:
             function_name="get_secrets",
             context={"secret_name": secret_name}
         ) from json_error
-
-
-def decrypt_kms_ciphertext(kms_id: str, ciphertext: str) -> str:
-    """
-    Decrypt a base64-encoded ciphertext using AWS KMS.
-
-    Args:
-        kms_id (str): The KMS Key ID used for decryption.
-        ciphertext (str): Base64-encoded ciphertext to decrypt.
-
-    Returns:
-        str: Decrypted plaintext string.
-
-    Raises:
-        KMSDecryptionError: If decryption fails.
-    """
-    try:
-        # Decode the ciphertext from Base64 format
-        ciphertext_blob = base64.b64decode(ciphertext)
-
-        # Perform decryption using AWS KMS
-        response = kms_client.decrypt(CiphertextBlob=ciphertext_blob, KeyId=kms_id)
-
-        # Extract the plaintext and decode it to a string
-        plaintext = response["Plaintext"].decode("utf-8")
-        return plaintext
-
-    except (ClientError, BotoCoreError) as aws_error:
-        raise KMSDecryptionError(
-            error=str(aws_error),
-            error_code="KMS_DECRYPTION_FAILED",
-            function_name="decrypt_kms_ciphertext",
-            context={"kms_id": kms_id, "ciphertext": ciphertext}
-        )
-    except Exception as error:
-        raise KMSDecryptionError(
-            error=str(error),
-            error_code="UNEXPECTED_ERROR",
-            function_name="decrypt_kms_ciphertext",
-            context={"kms_id": kms_id}
-        )

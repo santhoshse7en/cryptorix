@@ -1,1 +1,1 @@
-from .manager import get_rsa_key, get_secrets, decrypt_kms_ciphertext
+from .manager import retrieve_secret_key, retrieve_decrypted_secret_key, get_secrets

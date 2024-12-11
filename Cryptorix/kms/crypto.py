@@ -1,6 +1,7 @@
 import json
 import os
 from base64 import b64decode, b64encode
+from typing import Union
 
 import boto3
 
@@ -18,8 +19,8 @@ def encrypt(plaintext: str, kms_id: str) -> str:
     Encrypts a plaintext string using AWS KMS.
 
     Args:
-        kms_id (str): The KMS Key ID used for encryption.
         plaintext (str): The plaintext string to encrypt.
+        kms_id (str): The KMS Key ID used for encryption.
 
     Returns:
         str: The encrypted value as a base64-encoded string.
@@ -28,53 +29,65 @@ def encrypt(plaintext: str, kms_id: str) -> str:
         KMSEncryptionError: If the encryption process fails.
     """
     try:
-        # Encrypt the plaintext using AWS KMS
-        response = kms_client.encrypt(KeyId=kms_id, Plaintext=plaintext.encode("utf-8"))
-
-        # Encode the ciphertext blob as a base64 string
-        ciphertext = b64encode(response["CiphertextBlob"]).decode("utf-8")
-        return ciphertext
-
+        encrypted_response = kms_client.encrypt(
+            KeyId=kms_id,
+            Plaintext=plaintext.encode("utf-8")
+        )
+        return b64encode(encrypted_response["CiphertextBlob"]).decode("utf-8")
     except Exception as error:
         raise KMSEncryptionError(
             error=str(error),
             error_code="ENCRYPTION_ERROR",
             function_name="encrypt",
             context={"kms_id": kms_id}
-        )
+        ) from error
 
 
-def decrypt(encrypted_value: str, lambda_function_name: str, kms_id: str) -> dict:
+def decrypt(encrypted_value: str, kms_id: str) -> Union[dict, str]:
     """
     Decrypts a KMS-encrypted base64-encoded string.
 
     Args:
-        kms_id (str): The KMS Key ID used for decryption.
-        lambda_function_name (str): The Lambda function name for encryption context.
         encrypted_value (str): The base64-encoded encrypted string to decrypt.
+        kms_id (str): The KMS Key ID used for decryption.
 
     Returns:
-        dict: The decrypted value as a dictionary.
+        Union[dict, str]: The decrypted value as a dictionary or string.
 
     Raises:
         KMSDecryptionError: If the decryption process fails.
     """
     try:
-        # Decrypt the encrypted value using AWS KMS
         decrypted_response = kms_client.decrypt(
             KeyId=kms_id,
-            CiphertextBlob=b64decode(encrypted_value),
-            EncryptionContext={"LambdaFunctionName": lambda_function_name}
+            CiphertextBlob=b64decode(encrypted_value)
         )
-
-        # Decode and parse the decrypted plaintext
-        decrypted_value = json.loads(decrypted_response["Plaintext"].decode("utf-8"))
-        return decrypted_value
-
+        return __parse_output(decrypted_response["Plaintext"].decode("utf-8"))
     except Exception as error:
         raise KMSDecryptionError(
             error=str(error),
             error_code="DECRYPTION_ERROR",
             function_name="decrypt",
-            context={"kms_id": kms_id, "lambda_function_name": lambda_function_name}
+            context={
+                "kms_id": kms_id,
+                "encrypted_value": encrypted_value[:30] + "..."  # Mask long values for logs
+            }
         ) from error
+
+
+def __parse_output(response: str) -> Union[dict, str]:
+    """
+    Parses the decrypted response into a dictionary if possible, otherwise returns it as a string.
+
+    Args:
+        response (str): The decrypted response string.
+
+    Returns:
+        Union[dict, str]: Parsed dictionary or the original string.
+    """
+    try:
+        if response.strip().startswith("{"):
+            return json.loads(response)
+        return response
+    except json.JSONDecodeError:
+        return response

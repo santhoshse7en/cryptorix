@@ -67,10 +67,10 @@ It integrates with AWS KMS to securely manage encryption keys.
 
 **Functions:**
 
-* `decrypt(encrypted_value, lambda_function_name, kms_id)`: Decrypts a KMS-encrypted,
-  base64-encoded string.
 * `encrypt(plaintext, kms_id)`: Encrypts a plaintext string using AWS KMS and returns the encrypted
   value as a base64 string.
+* `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted,
+  base64-encoded string.
 
 ### Secrets Manager
 
@@ -79,11 +79,11 @@ ensuring that sensitive information is handled securely.
 
 **Functions:**
 
-* `get_rsa_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts the RSA key from
-  AWS Secrets Manager using KMS.
-* `get_secrets(secret_name, secret_key)`: Retrieves a specific key from a secret stored in
+* `retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts the
+  key from AWS Secrets Manager using KMS.
+* `retrieve_secret_key(secret_name, secret_key)`: Retrieves a specific key from a secrets stored in
   AWS Secrets Manager.
-* `decrypt_kms_ciphertext(ciphertext, kms_id)`: Decrypts base64-encoded ciphertext using AWS KMS.
+* `get_secrets(ciphertext, kms_id)`: Retrieves a specific secrets stored from AWS Secrets Manager.
 
 ## Installation
 
@@ -185,7 +185,8 @@ rsa_padding = "your_padding_type"
 
 try:
     # Decrypt the data
-    decrypted_response = decrypt(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)
+    decrypted_response = decrypt(encrypted_data, encrypted_key, secret_name, secret_key, kms_id,
+                                 rsa_padding)
     print("Decrypted Response:", decrypted_response)
 except Exception as e:
     print(f"Error during decryption: {e}")
@@ -220,23 +221,22 @@ from Cryptorix.kms import decrypt
 
 # Input data
 encrypted_value = "your_base64_encoded_encrypted_value_here"
-lambda_function_name = "your_lambda_function_name"
 kms_id = "your_kms_key_id"
 
 try:
     # Call to decrypt the KMS-encrypted value
-    decrypted_value = decrypt(encrypted_value, lambda_function_name, kms_id)
+    decrypted_value = decrypt(encrypted_value, kms_id)
     print("Decrypted value:", decrypted_value)
 except Exception as e:
     print(f"Error during decryption: {e}")
 ```
 
-### Retrieve RSA Key:
+### Retrieve Decrypted Secret Key Value:
 
-This function retrieves and decrypts the RSA key from AWS Secrets Manager using AWS KMS.
+This function Retrieves and decrypts the specific key from AWS Secrets Manager using KMS.
 
 ```python
-from Cryptorix.secrets import get_rsa_key
+from Cryptorix.secrets import retrieve_decrypted_secret_key
 
 # Input data
 secret_name = "your_secret_name"
@@ -244,8 +244,27 @@ secret_key = "your_secret_key"
 kms_id = "your_kms_key_id"
 
 try:
-    # Call to get_rsa_key to retrieve and decrypt the RSA key
-    rsa_key = get_rsa_key(secret_name, secret_key, kms_id)
+    # Call to retrieve_decrypted_secret_key to retrieve and decrypt the key
+    rsa_key = retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)
+    print("Decrypted RSA key:", rsa_key)
+except Exception as e:
+    print(f"Error while fetching RSA key: {e}")
+```
+
+### Retrieve Secret Key Value:
+
+This function retrieves a specific key from a secrets stored in AWS Secrets Manager.
+
+```python
+from Cryptorix.secrets import retrieve_secret_key
+
+# Input data
+secret_name = "your_secret_name"
+secret_key = "your_secret_key"
+
+try:
+    # Call to retrieve_secret_key to retrieve the key
+    rsa_key = retrieve_secret_key(secret_name, secret_key)
     print("Decrypted RSA key:", rsa_key)
 except Exception as e:
     print(f"Error while fetching RSA key: {e}")
@@ -253,7 +272,7 @@ except Exception as e:
 
 ### Retrieve Secrets:
 
-This function retrieves a specific key from AWS Secrets Manager without decryption.
+This function retrieves specific secrets from AWS Secrets Manager.
 
 ```python
 from Cryptorix.secrets import get_secrets
@@ -263,30 +282,11 @@ secret_name = "your_secret_name"
 secret_key = "your_secret_key"
 
 try:
-    # Call to get_secrets to fetch only the specific key value
+    # Call to get_secrets to fetch only the specific secrets
     secret_data = get_secrets(secret_name, secret_key)
     print("Secret data retrieved:", secret_data)
 except Exception as e:
     print(f"Error while retrieving secrets: {e}")
-```
-
-### Retrieve Secrets:
-
-This function decrypts a given base64-encoded ciphertext using AWS KMS directly.
-
-```python
-from Cryptorix.secrets import decrypt_kms_ciphertext
-
-# Input data
-kms_id = "your_kms_key_id"
-ciphertext = "your_base64_encoded_ciphertext"
-
-try:
-    # Call to decrypt_kms_ciphertext to decrypt the base64 KMS ciphertext
-    decrypted_data = decrypt_kms_ciphertext(ciphertext, kms_id)
-    print("Decrypted KMS ciphertext:", decrypted_data)
-except Exception as e:
-    print(f"Error while decrypting KMS ciphertext: {e}")
 ```
 
 ### Exceptions

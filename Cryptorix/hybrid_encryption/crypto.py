@@ -8,7 +8,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
 from Cryptorix.hybrid_encryption.exceptions import HybridEncryptionError
-from Cryptorix.secrets.manager import get_rsa_key
+from Cryptorix.secrets.manager import retrieve_decrypted_secret_key, retrieve_secret_key
 
 
 class HybridEncryptionService:
@@ -28,8 +28,8 @@ class HybridEncryptionService:
             api_response: dict,
             secret_name: str,
             secret_key: str,
-            kms_id: str,
-            rsa_padding: str = "PKCS1_OAEP"
+            kms_id: str = None,
+            rsa_padding: str = "PKCS1_OAEP",
     ) -> dict:
         """
         Encrypts data using a hybrid encryption scheme.
@@ -38,8 +38,8 @@ class HybridEncryptionService:
             api_response (dict): Plain Data to encrypt.
             secret_name (str): RSA secret name.
             secret_key (str): RSA key secret identifier.
-            kms_id (str): KMS unique identifier.
-            rsa_padding (str): RSA padding method ('OAEP' or 'PKCS1_v1_5').
+            kms_id (str, optional): KMS unique identifier for decrypting the RSA key, if applicable.
+            rsa_padding (str, optional): RSA padding method ('OAEP' or 'PKCS1_v1_5').
 
         Returns:
             dict: Contains Encrypted Data and Encrypted AES Session Key.
@@ -64,8 +64,8 @@ class HybridEncryptionService:
 
             # Return response
             return {
-                "encryptedData": base64.b64encode(iv + ciphertext).decode("utf-8"),
-                "encryptedKey": base64.b64encode(encrypted_aes_key).decode("utf-8"),
+                "encrypted_data": base64.b64encode(iv + ciphertext).decode("utf-8"),
+                "encrypted_key": base64.b64encode(encrypted_aes_key).decode("utf-8"),
             }
 
         except Exception as error:
@@ -82,7 +82,7 @@ class HybridEncryptionService:
             encrypted_key: str,
             secret_name: str,
             secret_key: str,
-            kms_id: str,
+            kms_id: str = None,
             rsa_padding: str = "PKCS1_OAEP"
     ) -> dict:
         """
@@ -93,8 +93,8 @@ class HybridEncryptionService:
             encrypted_key (str): Base64-encoded encrypted AES key.
             secret_name (str): RSA secret name.
             secret_key (str): RSA key secret identifier.
-            kms_id (str): KMS unique identifier.
-            rsa_padding (str): RSA padding method.
+            kms_id (str, optional): KMS unique identifier for decrypting the RSA key, if applicable.
+            rsa_padding (str, optional): RSA padding method.
 
         Returns:
             dict: Decrypted payload.
@@ -128,7 +128,12 @@ class HybridEncryptionService:
                 error=str(error),
                 error_code="DECRYPTION_FAILED",
                 function_name="decrypt",
-                context={"secret_name": secret_name, "kms_id": kms_id}
+                context={
+                    "secret_name": secret_name,
+                    "kms_id": kms_id,
+                    "encrypted_key": encrypted_key[:30] + "...",  # Mask long values for logs
+                    "encrypted_data": encrypted_data[:30] + "..."  # Mask long values for logs
+                }
             ) from error
 
     @staticmethod
@@ -145,7 +150,10 @@ class HybridEncryptionService:
             RSA.RsaKey: Validated RSA key.
         """
         try:
-            key_pem = get_rsa_key(secret_name, secret_key, kms_id)
+            if kms_id:
+                key_pem = retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)
+            else:
+                key_pem = retrieve_secret_key(secret_name, secret_key)
             return RSA.import_key(key_pem)
         except Exception as e:
             raise HybridEncryptionError(
