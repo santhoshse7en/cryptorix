@@ -5,7 +5,7 @@ from typing import Union
 
 import boto3
 
-from Cryptorix.kms.exceptions import KMSDecryptionError, KMSEncryptionError
+from Cryptorix.exceptions import EncryptionError
 
 # Set default AWS region, falling back to "ap-south-1" if not set
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
@@ -26,17 +26,19 @@ def encrypt(plaintext: str, kms_id: str) -> str:
         str: The encrypted value as a base64-encoded string.
 
     Raises:
-        KMSEncryptionError: If the encryption process fails.
+        EncryptionError: If the encryption process fails.
     """
     try:
+        # Encrypt the plaintext using KMS and get the encrypted blob
         encrypted_response = kms_client.encrypt(
             KeyId=kms_id,
             Plaintext=plaintext.encode("utf-8")
         )
         return b64encode(encrypted_response["CiphertextBlob"]).decode("utf-8")
     except Exception as error:
-        raise KMSEncryptionError(
-            error=str(error),
+        # Handle encryption error with relevant context
+        raise EncryptionError(
+            error=f"Failed to encrypt data: {error}",
             error_code="ENCRYPTION_ERROR",
             function_name="encrypt",
             context={"kms_id": kms_id}
@@ -55,39 +57,43 @@ def decrypt(encrypted_value: str, kms_id: str) -> Union[dict, str]:
         Union[dict, str]: The decrypted value as a dictionary or string.
 
     Raises:
-        KMSDecryptionError: If the decryption process fails.
+        EncryptionError: If the decryption process fails.
     """
     try:
+        # Decode the encrypted value and decrypt using KMS
         decrypted_response = kms_client.decrypt(
             KeyId=kms_id,
             CiphertextBlob=b64decode(encrypted_value)
         )
+        # Parse the decrypted plaintext
         return __parse_output(decrypted_response["Plaintext"].decode("utf-8"))
     except Exception as error:
-        raise KMSDecryptionError(
-            error=str(error),
+        # Handle decryption error with relevant context
+        raise EncryptionError(
+            error=f"Failed to decrypt data: {error}",
             error_code="DECRYPTION_ERROR",
             function_name="decrypt",
             context={
                 "kms_id": kms_id,
-                "encrypted_value": encrypted_value[:30] + "..."  # Mask long values for logs
+                "encrypted_value": encrypted_value[:30] + "..."  # Mask long encrypted data
             }
         ) from error
 
 
 def __parse_output(response: str) -> Union[dict, str]:
     """
-    Parses the decrypted response into a dictionary if possible, otherwise returns it as a string.
+    Parses the decrypted response into a dictionary if it is JSON,
+    otherwise returns the original string.
 
     Args:
         response (str): The decrypted response string.
 
     Returns:
-        Union[dict, str]: Parsed dictionary or the original string.
+        Union[dict, str]: Parsed dictionary or the original string if not a valid JSON.
     """
     try:
-        if response.strip().startswith("{"):
-            return json.loads(response)
-        return response
+        # Attempt to parse the response as JSON
+        return json.loads(response) if response.strip().startswith("{") else response
     except json.JSONDecodeError:
+        # If not a valid JSON, return as a string
         return response

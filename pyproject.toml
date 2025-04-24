@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Cryptorix"
+version = "1.0.5"
+description = "A Python package that provides robust encryption and decryption mechanisms, utilizing AES, JWE, Hybrid Encryption, AWS KMS, and AWS Secrets Manager."
+authors = [
+    { name = "M Santhosh Kumar", email = "santhoshse7en@gmail.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = [
+    "AES", "JWE", "Hybrid Encryption", "KMS", "Secrets Manager",
+    "Encryption", "Decryption", "AWS", "Security", "Cryptography"
+]
+dependencies = [
+    "jwcrypto>=1.0.0", # JSON Web Encryption handling
+    "pycryptodome>=3.10.0", # Cryptography toolkit
+    "boto3>=1.20.0"  # AWS SDK for KMS & Secrets Manager
+]
+
+[project.urls]
+Documentation = "https://github.com/santhoshse7en/cryptorix#readme"
+Source = "https://github.com/santhoshse7en/cryptorix"
+Tracker = "https://github.com/santhoshse7en/cryptorix/issues"
+
+[tool.setuptools]
+packages = ["Cryptorix"]
+
+[tool.setuptools.package-data]
+Cryptorix = ["*.py"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]

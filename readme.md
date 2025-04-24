@@ -10,10 +10,11 @@ AWS KMS and Secrets Manager to manage encryption keys securely.
 
 * [Overview](#overview)
 * [Modules](#modules)
-    * [JWE (JSON Web Encryption)](#jwe-json-web-encryption)
-    * [Hybrid Encryption](#hybrid-encryption)
-    * [KMS (Key Management System)](#kms-key-management-system)
-    * [Secrets Manager](#secrets-manager)
+    * [AES (Key Management System)](#aes-advanced-encryption-standard-module)
+    * [JWE (JSON Web Encryption)](#jwe-json-web-encryption-module)
+    * [Hybrid Encryption](#hybrid-encryption-module)
+    * [KMS (Key Management System)](#kms-key-management-system-module)
+    * [Secrets Manager](#secrets-manager-module)
 * [Installation](#installation)
 * [Usage](#usage)
 * [Exceptions](#exceptions)
@@ -26,64 +27,79 @@ AWS KMS and Secrets Manager to manage encryption keys securely.
 ## Overview
 
 Cryptorix allows you to encrypt and decrypt data using industry-standard encryption algorithms,
-focusing on JWE for secure token exchange, Hybrid Encryption for data security, and
-AWS services (KMS and Secrets Manager) for key management. The package ensures seamless integration
-with AWS services for encryption at rest and in transit.
+focusing on AES for secure data, JWE for secure token exchange, Hybrid Encryption for data security,
+and AWS services (KMS and Secrets Manager) for key management.
+The package ensures seamless integration with AWS services for encryption at rest and in transit.
 
 ## Modules
 
-### JWE (JSON Web Encryption)
+### AES (Advanced Encryption Standard) Module
 
-This module facilitates the encryption and decryption of data using the JWE standard,
-combining RSA encryption for key management and AES-GCM encryption for content.
+This module provides functionality to securely encrypt and decrypt data using the
+AES (Advanced Encryption Standard) algorithm.
 
 **Functions:**
 
-* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary into a JWE token
-  using RSA encryption for the AES key and AES-GCM for the content.
-* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts a JWE token into its original
-  dictionary form using the RSA private key.
+* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`)
+  using the provided AES key and associated metadata (`secret_name`, `secret_key`, `kms_id`).
+* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts an AES-encrypted payload
+  (`jwe_payload`) and restores it to its original dictionary format using the
+  same AES key & metadata.
 
-### Hybrid Encryption
+### JWE (JSON Web Encryption) Module
 
-This module provides hybrid encryption functionality using AES for encrypting data and RSA for
-encrypting the AES session key. The encrypted data is Base64-encoded to ensure secure and safe
-transmission across communication channels.
+This module enables secure data encryption and decryption using the JWE standard,
+which combines RSA for key encryption and AES-GCM for encrypting the actual content.
+
+**Functions:**
+
+* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`)
+  into a JWE token. It uses RSA encryption to protect the AES key and AES-GCM to encrypt the
+  payload content.
+* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts a JWE token (`jwe_payload`)
+  back into its original dictionary form using the associated RSA private key and metadata.
+
+### Hybrid Encryption Module
+
+This module implements hybrid encryption, utilizing AES for encrypting the data and RSA for
+encrypting the AES session key. The resulting encrypted data is Base64-encoded, ensuring secure
+transmission over communication channels.
 
 **Functions:**
 
 * `encrypt_data(api_response, secret_name, secret_key, kms_id, rsa_padding)`: Encrypts the provided
-  data using a hybrid encryption scheme. AES (in either GCM or CBC mode) is used for data
-  encryption, while RSA encrypts the AES session key. The data is then Base64-encoded for
-  secure transmission.
+  data (`api_response`) using a hybrid encryption scheme. AES (in either GCM or CBC mode) is used
+  for encrypting the data, while RSA encrypts the AES session key. The encrypted data is then
+  Base64-encoded for secure transmission.
 * `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)`:
-  Decrypts the provided Base64-encoded encrypted data using RSA to retrieve the AES session key
-  and AES-GCM/CBC for decrypting the actual data.
+  Decrypts the provided Base64-encoded encrypted data (`encrypted_data`) by first using RSA to
+  decrypt the AES session key, and then using AES-GCM/CBC to decrypt the actual data.
 
-### KMS (Key Management System)
+### KMS (Key Management System) Module
 
-This module provides AWS KMS-based encryption and decryption of data.
-It integrates with AWS KMS to securely manage encryption keys.
-
-**Functions:**
-
-* `encrypt(plaintext, kms_id)`: Encrypts a plaintext string using AWS KMS and returns the encrypted
-  value as a base64 string.
-* `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted,
-  base64-encoded string.
-
-### Secrets Manager
-
-This module interacts with AWS Secrets Manager to retrieve and decrypt secrets,
-ensuring that sensitive information is handled securely.
+This module integrates with AWS Key Management Service (KMS) to provide secure encryption and
+decryption of data, leveraging AWS's managed encryption keys.
 
 **Functions:**
 
-* `retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts the
-  key from AWS Secrets Manager using KMS.
-* `retrieve_secret_key(secret_name, secret_key)`: Retrieves a specific key from a secrets stored in
-  AWS Secrets Manager.
-* `get_secrets(ciphertext, kms_id)`: Retrieves a specific secrets stored from AWS Secrets Manager.
+* `encrypt(plaintext, kms_id)`: Encrypts a plaintext string (`plaintext`) using AWS KMS and returns
+  the encrypted value as a Base64-encoded string.
+* `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted, Base64-encoded string
+  (`encrypted_value`) using the specified KMS key (kms_id).
+
+### Secrets Manager Module
+
+This module interacts with AWS Secrets Manager to securely retrieve and decrypt sensitive
+information, such as secrets and credentials, ensuring they are handled safely.
+
+**Functions:**
+
+* `retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts a secret
+  key from AWS Secrets Manager, utilizing AWS KMS for decryption.
+* `retrieve_secret_key(secret_name, secret_key)`: Retrieves a specific key stored in AWS Secrets
+  Manager without decrypting it.
+* `get_secrets(ciphertext, kms_id)`: Retrieves a specific secret stored in AWS Secrets Manager
+  and decrypts it using the provided KMS key (kms_id).
 
 ## Installation
 
@@ -93,200 +109,283 @@ To install the Cryptorix package, use pip:
 pip install Cryptorix
 ```
 
-You also need to install dependencies such as boto3, pycryptodome, and jwcrypto.
-You can install them with:
-
-```bash
-pip install boto3 pycryptodome jwcrypto
-```
-
 ## Usage
 
 Here is a basic example of how to use the package:
 
-### Encrypting Data (JWE):
+### 🔐 AES Encryption:
 
-This function encrypts a dictionary payload using RSA to encrypt the AES key and AES-GCM for content
-encryption.
+Encrypt a dictionary payload using an AES key to produce a secure, encrypted string.
+
+```python
+from Cryptorix.aes import encrypt
+
+# Sample data to encrypt
+data_to_encrypt = {
+    "user": "John Doe",
+    "transaction_id": "123456",
+    "status": "completed"
+}
+aes_key = "your_aes_key"
+
+try:
+    # Encrypt the data
+    encrypted_data = encrypt(api_response=data_to_encrypt, aes_key=aes_key)
+    print("🔒 Encrypted Data:", encrypted_data)
+except Exception as error:
+    print(f"❌ Encryption Error: {error}")
+```
+
+### 🔓 AES Decryption:
+
+Decrypt the AES-encrypted payload using the same AES key to retrieve the original dictionary.
+
+```python
+from Cryptorix.aes import decrypt
+
+# Encrypted data string (JWE format)
+encrypted_data = "your-encrypted-data"
+aes_key = "your_aes_key"
+
+try:
+    # Decrypt the data
+    decrypted_data = decrypt(encrypted_data=encrypted_data, aes_key=aes_key)
+    print("✅ Decrypted Payload:", decrypted_data)
+except Exception as error:
+    print(f"❌ Decryption Error: {error}")
+```
+
+### 🔐 JWE  Encryption:
+
+Encrypts a dictionary payload using AES-GCM for content encryption and RSA to encrypt the AES key.
+Key materials are securely retrieved via AWS KMS and Secrets Manager.
 
 ```python
 from Cryptorix.jwe import encrypt
 
-# Input data
-api_response = {"user": "John Doe", "transaction_id": "123456", "status": "completed"}
-secret_name = "your_secret_name"
-secret_key = "your_secret_key"
-kms_id = "your_kms_key_id"
+# Data to encrypt
+data_to_encrypt = {
+    "user": "John Doe",
+    "transaction_id": "123456",
+    "status": "completed"
+}
+
+# Key management inputs
+secret_name = "your_secret_name"  # AWS Secrets Manager name
+secret_key = "your_secret_key"  # Key name inside the secret (e.g., public key)
+kms_id = "your_kms_key_id"  # AWS KMS Key ID
 
 try:
-    # Call to encrypt to create the JWE token
-    jwe_token = encrypt(api_response, secret_name, secret_key, kms_id)
-    print("Generated JWE Token:", jwe_token)
-except Exception as e:
-    print(f"Error during encryption: {e}")
+    # Generate JWE token
+    jwe_token = encrypt(
+        api_response=data_to_encrypt,
+        secret_name=secret_name,
+        secret_key=secret_key,
+        kms_id=kms_id
+    )
+    print("🔐 Generated JWE Token:", jwe_token)
+except Exception as error:
+    print(f"❌ Encryption Error: {error}")
 ```
 
-### Decrypting Data (JWE):
+### 🔓 JWE Decryption:
 
-This function decrypts the JWE payload back into its original dictionary form using RSA decryption.
+Decrypts the JWE token back into its original dictionary form using the corresponding RSA private
+key.
 
 ```python
 from Cryptorix.jwe import decrypt
 
-# JWE token to decrypt
+# Encrypted JWE token
 jwe_token = "your-encrypted-jwe-token"
 
-secret_name = "your-secret-name"  # AWS Secrets Manager secret name
-secret_key = "private-key"  # Key name in the secret (private key)
-kms_id = "your-kms-key-id"  # AWS KMS key ID
-
-# Decrypt data using JWE
-decrypted_payload = decrypt(jwe_token, secret_name, secret_key, kms_id)
-print("Decrypted Payload:", decrypted_payload)
-```
-
-### Encrypting Data (Hybrid Encryption):
-
-You can use the encrypt_data function to encrypt your sensitive data.
-
-```python
-from Cryptorix.hybrid_encryption import encrypt
-
-# Input data to encrypt
-api_response = {"username": "admin", "password": "secure_password"}
-secret_name = "your_secret_name"
-secret_key = "your_secret_key"
-kms_id = "your_kms_key_id"
-rsa_padding = "your_padding_type"
+# Key management inputs
+secret_name = "your_secret_name"  # AWS Secrets Manager name
+secret_key = "private-key"  # Key name in the secret (e.g., private key)
+kms_id = "your_kms_key_id"  # AWS KMS Key ID
 
 try:
-    # Encrypt the data
-    result = encrypt(api_response, secret_name, secret_key, kms_id, rsa_padding)
-    print("Encrypted Data:", result["encryptedData"])
-    print("Encrypted Key:", result["encryptedKey"])
-except Exception as e:
-    print(f"Error during encryption: {e}")
+    # Decrypt the JWE token
+    decrypted_data = decrypt(
+        jwe_payload=jwe_token,
+        secret_name=secret_name,
+        secret_key=secret_key,
+        kms_id=kms_id
+    )
+    print("✅ Decrypted Payload:", decrypted_data)
+except Exception as error:
+    print(f"❌ Decryption Error: {error}")
 ```
 
-### Decrypting Data (Hybrid Encryption):
+### 🔐 Hybrid Encryption:
 
-You can use the decrypt_data function to decrypt the previously encrypted data.
+Encrypt sensitive data using hybrid encryption: AES-GCM for content encryption and
+RSA (via AWS KMS and Secrets Manager) for encrypting the AES key.
 
 ```python
-from Cryptorix.hybrid_encryption import decrypt
+from Cryptorix.hybrid import encrypt
 
-# Input data to decrypt
+# Payload to be encrypted
+sensitive_data = {
+    "username": "admin",
+    "password": "secure_password"
+}
+
+# Encryption parameters
+secret_name = "your_secret_name"  # AWS Secrets Manager secret name
+secret_key = "your_secret_key"  # Key name within the secret (e.g., public key)
+kms_id = "your_kms_key_id"  # AWS KMS Key ID
+rsa_padding = "your_padding_type"  # RSA padding scheme (e.g., "PKCS1v15", "OAEP")
+
+try:
+    # Perform hybrid encryption
+    encrypted_result = encrypt(
+        api_response=sensitive_data,
+        secret_name=secret_name,
+        secret_key=secret_key,
+        kms_id=kms_id,
+        rsa_padding=rsa_padding
+    )
+
+    print("🔐 Encrypted Data:", encrypted_result["encryptedData"])
+    print("🔑 Encrypted AES Key:", encrypted_result["encryptedKey"])
+
+except Exception as error:
+    print(f"❌ Encryption Error: {error}")
+```
+
+### 🔓 Hybrid Decryption:
+
+Decrypt the hybrid-encrypted payload using the corresponding RSA private key and AES-GCM.
+
+```python
+from Cryptorix.hybrid import decrypt
+
+# Encrypted inputs
 encrypted_data = "your_base64_encoded_encrypted_data"
 encrypted_key = "your_base64_encoded_encrypted_key"
-secret_name = "your_secret_name"
-secret_key = "your_secret_key"
-kms_id = "your_kms_key_id"
-rsa_padding = "your_padding_type"
+
+# Decryption parameters
+secret_name = "your_secret_name"  # AWS Secrets Manager secret name
+secret_key = "your_secret_key"  # Key name within the secret (e.g., private key)
+kms_id = "your_kms_key_id"  # AWS KMS Key ID
+rsa_padding = "your_padding_type"  # RSA padding scheme
 
 try:
-    # Decrypt the data
-    decrypted_response = decrypt(encrypted_data, encrypted_key, secret_name, secret_key, kms_id,
-                                 rsa_padding)
-    print("Decrypted Response:", decrypted_response)
-except Exception as e:
-    print(f"Error during decryption: {e}")
+    # Perform hybrid decryption
+    decrypted_payload = decrypt(
+        encrypted_data=encrypted_data,
+        encrypted_key=encrypted_key,
+        secret_name=secret_name,
+        secret_key=secret_key,
+        kms_id=kms_id,
+        rsa_padding=rsa_padding
+    )
+
+    print("✅ Decrypted Response:", decrypted_payload)
+
+except Exception as error:
+    print(f"❌ Decryption Error: {error}")
 ```
 
-### Encrypting Data (KMS):
+### 🔐 KMS Encryption:
 
-This function encrypts a plaintext string using AWS KMS and returns the encrypted value encoded as a
-Base64 string.
+Encrypt a plaintext string using AWS Key Management Service (KMS).
+The result is a base64-encoded encrypted value.
 
 ```python
 from Cryptorix.kms import encrypt
 
-# Input data
+# Sensitive information to encrypt
 plaintext = "your-sensitive-data"
-kms_id = "your_kms_key_id"
+kms_id = "your_kms_key_id"  # AWS KMS key ID
 
 try:
-    # Call to encrypt the plaintext
-    encrypted_value = encrypt(plaintext, kms_id)
-    print("Encrypted value (base64 encoded):", encrypted_value)
-except Exception as e:
-    print(f"Error during encryption: {e}")
+    # Encrypt using KMS
+    encrypted_output = encrypt(plaintext=plaintext, kms_id=kms_id)
+    print("🔐 Encrypted Value (Base64):", encrypted_output)
+except Exception as error:
+    print(f"❌ Encryption Error: {error}")
 ```
 
-### Decrypting Data (KMS):
+### 🔓 KMS Decryption:
 
-This function decrypts a KMS-encrypted base64-encoded string back to its original plaintext form.
+Decrypt a KMS-encrypted base64-encoded string back to its original plaintext using the same KMS key.
 
 ```python
 from Cryptorix.kms import decrypt
 
-# Input data
+# Encrypted base64 string to decrypt
 encrypted_value = "your_base64_encoded_encrypted_value_here"
-kms_id = "your_kms_key_id"
+kms_id = "your_kms_key_id"  # AWS KMS key ID
 
 try:
-    # Call to decrypt the KMS-encrypted value
-    decrypted_value = decrypt(encrypted_value, kms_id)
-    print("Decrypted value:", decrypted_value)
-except Exception as e:
-    print(f"Error during decryption: {e}")
+    # Decrypt using KMS
+    decrypted_output = decrypt(encrypted_value=encrypted_value, kms_id=kms_id)
+    print("✅ Decrypted Value:", decrypted_output)
+except Exception as error:
+    print(f"❌ Decryption Error: {error}")
 ```
 
-### Retrieve Decrypted Secret Key Value:
+### 🔐 Retrieve Decrypted Secret Key:
 
-This function Retrieves and decrypts the specific key from AWS Secrets Manager using KMS.
+Fetch and decrypt a specific key from AWS Secrets Manager using AWS KMS.
 
 ```python
 from Cryptorix.secrets import retrieve_decrypted_secret_key
 
-# Input data
-secret_name = "your_secret_name"
-secret_key = "your_secret_key"
-kms_id = "your_kms_key_id"
+# Input parameters
+secret_name = "your_secret_name"  # Name of the secret in Secrets Manager
+secret_key = "your_secret_key"  # Specific key within the secret (e.g., RSA private key)
+kms_id = "your_kms_key_id"  # AWS KMS Key ID used for decryption
 
 try:
-    # Call to retrieve_decrypted_secret_key to retrieve and decrypt the key
-    rsa_key = retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)
-    print("Decrypted RSA key:", rsa_key)
-except Exception as e:
-    print(f"Error while fetching RSA key: {e}")
+    # Retrieve and decrypt the secret key
+    decrypted_key = retrieve_decrypted_secret_key(
+        secret_name=secret_name,
+        secret_key=secret_key,
+        kms_id=kms_id
+    )
+    print("🔓 Decrypted RSA Key:", decrypted_key)
+except Exception as error:
+    print(f"❌ Error retrieving decrypted secret key: {error}")
 ```
 
-### Retrieve Secret Key Value:
+### 📦 Retrieve Secret Key (Unencrypted):
 
-This function retrieves a specific key from a secrets stored in AWS Secrets Manager.
+Fetch a specific key from a plain secret in AWS Secrets Manager (no KMS decryption involved).
 
 ```python
 from Cryptorix.secrets import retrieve_secret_key
 
-# Input data
+# Input parameters
 secret_name = "your_secret_name"
 secret_key = "your_secret_key"
 
 try:
-    # Call to retrieve_secret_key to retrieve the key
-    rsa_key = retrieve_secret_key(secret_name, secret_key)
-    print("Decrypted RSA key:", rsa_key)
-except Exception as e:
-    print(f"Error while fetching RSA key: {e}")
+    # Retrieve the plain secret key
+    rsa_key = retrieve_secret_key(secret_name=secret_name, secret_key=secret_key)
+    print("🔑 Retrieved Secret Key:", rsa_key)
+except Exception as error:
+    print(f"❌ Error retrieving secret key: {error}")
 ```
 
-### Retrieve Secrets:
+### 🔍 Retrieve Full Secret:
 
-This function retrieves specific secrets from AWS Secrets Manager.
+Fetch the entire secret payload (as a dictionary) from AWS Secrets Manager.
 
 ```python
 from Cryptorix.secrets import get_secrets
 
-# Input data
+# Input parameter
 secret_name = "your_secret_name"
-secret_key = "your_secret_key"
 
 try:
-    # Call to get_secrets to fetch only the specific secrets
-    secret_data = get_secrets(secret_name, secret_key)
-    print("Secret data retrieved:", secret_data)
-except Exception as e:
-    print(f"Error while retrieving secrets: {e}")
+    # Retrieve the full secret object
+    secrets = get_secrets(secret_name=secret_name)
+    print("📁 Retrieved Secret Data:", secrets)
+except Exception as error:
+    print(f"❌ Error retrieving secrets: {error}")
 ```
 
 ### Exceptions

@@ -2,8 +2,8 @@ import json
 
 from jwcrypto import jwk, jwe
 
-from Cryptorix.jwe.exceptions import JWEError
-from Cryptorix.secrets.manager import retrieve_decrypted_secret_key, retrieve_secret_key
+from Cryptorix.exceptions import EncryptionError
+from Cryptorix.secrets import retrieve_decrypted_secret_key, retrieve_secret_key
 
 # Encryption and decryption algorithms
 ALGORITHM_KEY_ENC = "RSA-OAEP-256"
@@ -43,7 +43,7 @@ def encrypt(api_response: dict, secret_name: str, secret_key: str, kms_id: str =
 
     except Exception as error:
         # Log and raise a specific JWE error for failure
-        raise JWEError(
+        raise EncryptionError(
             error=str(error),
             error_code="ENCRYPTION_FAILED",
             function_name="encrypt",
@@ -81,7 +81,7 @@ def decrypt(jwe_payload: str, secret_name: str, secret_key: str, kms_id: str = N
 
     except Exception as error:
         # Log and raise a specific JWE error for failure
-        raise JWEError(
+        raise EncryptionError(
             error=str(error),
             error_code="DECRYPTION_FAILED",
             function_name="decrypt",
@@ -111,7 +111,7 @@ def _load_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> str:
         else:
             return retrieve_secret_key(secret_name, secret_key)
     except Exception as error:
-        raise JWEError(
+        raise EncryptionError(
             error="Invalid RSA key or failed fetch",
             error_code="RSA_LOAD_ERROR",
             context={"secret_name": secret_name, "kms_id": kms_id}

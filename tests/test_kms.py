@@ -1,14 +1,15 @@
 import json
 import unittest
+from unittest.mock import patch
 
 from Cryptorix.kms import encrypt, decrypt
 
 
-class TestHybridEncryption(unittest.TestCase):
+class TestKMSEncryption(unittest.TestCase):
 
     def setUp(self):
         # Set up common parameters for the tests
-        self.kms_id = ""
+        self.kms_id = "mock-kms-id"  # A valid mock ID for testing
         self.plaintext = "Testing KMS Encryption"
         self.api_response = {"encryption_type": "KMS"}
 
@@ -17,15 +18,12 @@ class TestHybridEncryption(unittest.TestCase):
             plaintext=self.plaintext,
             kms_id=self.kms_id
         )
-        print("Encrypted Response: ", encrypted_response)
 
         # Test decryption
         decrypted_response = decrypt(
             encrypted_value=encrypted_response,
             kms_id=self.kms_id
         )
-
-        print("Decrypted Response: ", decrypted_response)
 
         # Assert that the decrypted response matches the original response
         self.assertEqual(decrypted_response, self.plaintext)
@@ -35,7 +33,6 @@ class TestHybridEncryption(unittest.TestCase):
             plaintext=json.dumps(self.api_response),
             kms_id=self.kms_id
         )
-        print("Encrypted Response: ", encrypted_response)
 
         # Test decryption
         decrypted_response = decrypt(
@@ -43,10 +40,17 @@ class TestHybridEncryption(unittest.TestCase):
             kms_id=self.kms_id
         )
 
-        print("Decrypted Response: ", decrypted_response)
-
         # Assert that the decrypted response matches the original response
         self.assertEqual(decrypted_response, self.api_response)
+
+    @patch('Cryptorix.kms.decrypt')
+    def test_decryption_error(self, mock_decrypt):
+        # Simulate decryption failure
+        mock_decrypt.side_effect = Exception("Decryption failed")
+
+        with self.assertRaises(Exception) as context:
+            decrypt(encrypted_value="corrupted_data", kms_id=self.kms_id)
+        self.assertEqual(str(context.exception), "Decryption failed")
 
 
 if __name__ == "__main__":
