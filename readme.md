@@ -19,7 +19,7 @@ Key Features:
 
 Stay safe and keep your data secure with Cryptorix! 💡
 
-## Table of Contents 📚
+## 📚 Table of Contents
 
 * [Overview](#overview)
 * [Modules](#modules)
@@ -44,9 +44,9 @@ Stay safe and keep your data secure with Cryptorix! 💡
 
 With **Cryptorix**, you can easily ensure data confidentiality and integrity, and integrate seamlessly with AWS services for encryption at rest and in transit. 🔐💼
 
-## 🔧 Modules 🔧
+## 🔧 Modules
 
-### 🔑 AES (Advanced Encryption Standard) Module 🔑
+### 🔑 AES (Advanced Encryption Standard) Module
 
 This module enables secure encryption and decryption of data using the AES (Advanced Encryption Standard) algorithm.
 
@@ -55,7 +55,7 @@ This module enables secure encryption and decryption of data using the AES (Adva
 * `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`) using the provided AES key and metadata (`secret_name`, `secret_key`, `kms_id`). 🔒
 * `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts an AES-encrypted payload (`jwe_payload`) back into its original dictionary format. 🔓
 
-### 🌍 JWE (JSON Web Encryption) Module 🌍
+### 🌍 JWE (JSON Web Encryption) Module
 
 This module facilitates secure data encryption and decryption using the JWE standard, which combines RSA for key encryption and AES-GCM for content encryption.
 
@@ -64,7 +64,7 @@ This module facilitates secure data encryption and decryption using the JWE stan
 * `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`) into a JWE token using RSA encryption to protect the AES key and AES-GCM to encrypt the content. 🔏
 * `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts a JWE token (`jwe_payload`) back into its original dictionary form using RSA and AES. 🔓
 
-### 🔐 Hybrid Encryption Module 🔐
+### 🔐 Hybrid Encryption Module
 
 This module implements hybrid encryption, combining AES for encrypting data and RSA for encrypting the AES session key. The encrypted data is Base64-encoded for secure transmission.
 
@@ -73,7 +73,7 @@ This module implements hybrid encryption, combining AES for encrypting data and 
 * `encrypt_data(api_response, secret_name, secret_key, kms_id, rsa_padding)`: Encrypts the provided data (`api_response`) using hybrid encryption (AES for data, RSA for session key), then Base64-encodes the encrypted result. 🛡️
 * `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)`: Decrypts the Base64-encoded encrypted data using RSA and AES to restore the original data. 🔑
 
-### ☁️ KMS (Key Management System) Module ☁️
+### ☁️ KMS (Key Management System) Module
 
 This module integrates with AWS Key Management Service (KMS) to securely encrypt and decrypt data, leveraging AWS's managed encryption keys.
 
@@ -82,7 +82,7 @@ This module integrates with AWS Key Management Service (KMS) to securely encrypt
 * `encrypt(plaintext, kms_id)`: Encrypts a plaintext string (`plaintext`) using AWS KMS and returns the encrypted value as a Base64-encoded string. 🔐
 * `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted, Base64-encoded string (`encrypted_value`) using the specified KMS key (`kms_id`). 🔓
 
-### 🗝️ Secrets Manager Module 🗝️
+### 🗝️ Secrets Manager Module
 
 This module interacts with AWS Secrets Manager to securely retrieve and decrypt sensitive information like secrets and credentials.
 
@@ -92,7 +92,7 @@ This module interacts with AWS Secrets Manager to securely retrieve and decrypt 
 * `retrieve_secret_key(secret_name, secret_key)`: Retrieves a secret key from AWS Secrets Manager without decrypting it. 🛡️
 * `get_secrets(ciphertext, kms_id)`: Retrieves and decrypts a specific secret from AWS Secrets Manager using the provided KMS key (`kms_id`). 🔑
 
-## 🚀 Installation 🚀
+## 🚀 Installation
 
 To install the **Cryptorix** package, simply use **pip**:
 
