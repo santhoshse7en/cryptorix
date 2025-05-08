@@ -1,20 +1,34 @@
-# Cryptorix
+[![PyPI Version](https://img.shields.io/pypi/v/Cryptorix.svg?style=flat-square)](https://pypi.org/project/Cryptorix)
+[![License](https://img.shields.io/pypi/l/Cryptorix.svg?style=flat-square)](https://pypi.python.org/pypi/Cryptorix)
+[![Downloads](https://pepy.tech/badge/Cryptorix/month)](https://pepy.tech/project/Cryptorix)
 
-**Cryptorix** is a Python package that provides robust encryption and decryption mechanisms
-using JSON Web Encryption (JWE), Hybrid Encryption, AWS KMS, and AWS Secrets Manager.
-It leverages both symmetric (AES) and asymmetric (RSA) encryption techniques to ensure the
-confidentiality and integrity of your data. The package also integrates with
-AWS KMS and Secrets Manager to manage encryption keys securely.
+# Cryptorix 🔒
 
-## Table of Contents
+**Cryptorix** is a powerful Python package designed to offer robust encryption and decryption solutions using cutting-edge technologies like JSON Web Encryption (JWE), Hybrid Encryption, AWS KMS, and AWS Secrets Manager. 🛡️
+
+It combines both symmetric (AES) and asymmetric (RSA) encryption techniques to ensure the highest levels of **confidentiality** and **integrity** for your data. 🔐
+
+With seamless integration to AWS KMS and Secrets Manager, Cryptorix enables secure management of encryption keys, giving you peace of mind knowing your sensitive information is always protected. ☁️💼
+
+Key Features:
+
+* 🧑‍💻 **Symmetric (AES)** & **Asymmetric (RSA)** encryption
+* 🔑 **AWS KMS** integration for key management
+* 🔒 **AWS Secrets Manager** support for storing secrets securely
+* 🔐 Strong **data protection** and **privacy** mechanisms
+
+Stay safe and keep your data secure with Cryptorix! 💡
+
+## Table of Contents 📚
 
 * [Overview](#overview)
 * [Modules](#modules)
-    * [AES (Key Management System)](#aes-advanced-encryption-standard-module)
-    * [JWE (JSON Web Encryption)](#jwe-json-web-encryption-module)
-    * [Hybrid Encryption](#hybrid-encryption-module)
-    * [KMS (Key Management System)](#kms-key-management-system-module)
-    * [Secrets Manager](#secrets-manager-module)
+
+  * [AES (Key Management System)](#aes-advanced-encryption-standard-module)
+  * [JWE (JSON Web Encryption)](#jwe-json-web-encryption-module)
+  * [Hybrid Encryption](#hybrid-encryption-module)
+  * [KMS (Key Management System)](#kms-key-management-system-module)
+  * [Secrets Manager](#secrets-manager-module)
 * [Installation](#installation)
 * [Usage](#usage)
 * [Exceptions](#exceptions)
@@ -24,94 +38,74 @@ AWS KMS and Secrets Manager to manage encryption keys securely.
 * [Contributing](#contributing)
 * [Authors](#authors)
 
-## Overview
+## Overview 🌐
 
-Cryptorix allows you to encrypt and decrypt data using industry-standard encryption algorithms,
-focusing on AES for secure data, JWE for secure token exchange, Hybrid Encryption for data security,
-and AWS services (KMS and Secrets Manager) for key management.
-The package ensures seamless integration with AWS services for encryption at rest and in transit.
+**Cryptorix** is a powerful Python package that helps you encrypt and decrypt data securely using industry-standard encryption algorithms. It focuses on AES for data protection, JWE for secure token exchanges, Hybrid Encryption for high-level data security, and AWS services (KMS and Secrets Manager) for managing encryption keys.
 
-## Modules
+With **Cryptorix**, you can easily ensure data confidentiality and integrity, and integrate seamlessly with AWS services for encryption at rest and in transit. 🔐💼
 
-### AES (Advanced Encryption Standard) Module
+## Modules 🔧
 
-This module provides functionality to securely encrypt and decrypt data using the
-AES (Advanced Encryption Standard) algorithm.
+### AES (Advanced Encryption Standard) Module 🔑
+
+This module enables secure encryption and decryption of data using the AES (Advanced Encryption Standard) algorithm.
 
 **Functions:**
 
-* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`)
-  using the provided AES key and associated metadata (`secret_name`, `secret_key`, `kms_id`).
-* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts an AES-encrypted payload
-  (`jwe_payload`) and restores it to its original dictionary format using the
-  same AES key & metadata.
+* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`) using the provided AES key and metadata (`secret_name`, `secret_key`, `kms_id`). 🔒
+* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts an AES-encrypted payload (`jwe_payload`) back into its original dictionary format. 🔓
 
-### JWE (JSON Web Encryption) Module
+### JWE (JSON Web Encryption) Module 🌍
 
-This module enables secure data encryption and decryption using the JWE standard,
-which combines RSA for key encryption and AES-GCM for encrypting the actual content.
+This module facilitates secure data encryption and decryption using the JWE standard, which combines RSA for key encryption and AES-GCM for content encryption.
 
 **Functions:**
 
-* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`)
-  into a JWE token. It uses RSA encryption to protect the AES key and AES-GCM to encrypt the
-  payload content.
-* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts a JWE token (`jwe_payload`)
-  back into its original dictionary form using the associated RSA private key and metadata.
+* `encrypt(api_response, secret_name, secret_key, kms_id)`: Encrypts a dictionary (`api_response`) into a JWE token using RSA encryption to protect the AES key and AES-GCM to encrypt the content. 🔏
+* `decrypt(jwe_payload, secret_name, secret_key, kms_id)`: Decrypts a JWE token (`jwe_payload`) back into its original dictionary form using RSA and AES. 🔓
 
-### Hybrid Encryption Module
+### Hybrid Encryption Module 🔐
 
-This module implements hybrid encryption, utilizing AES for encrypting the data and RSA for
-encrypting the AES session key. The resulting encrypted data is Base64-encoded, ensuring secure
-transmission over communication channels.
+This module implements hybrid encryption, combining AES for encrypting data and RSA for encrypting the AES session key. The encrypted data is Base64-encoded for secure transmission.
 
 **Functions:**
 
-* `encrypt_data(api_response, secret_name, secret_key, kms_id, rsa_padding)`: Encrypts the provided
-  data (`api_response`) using a hybrid encryption scheme. AES (in either GCM or CBC mode) is used
-  for encrypting the data, while RSA encrypts the AES session key. The encrypted data is then
-  Base64-encoded for secure transmission.
-* `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)`:
-  Decrypts the provided Base64-encoded encrypted data (`encrypted_data`) by first using RSA to
-  decrypt the AES session key, and then using AES-GCM/CBC to decrypt the actual data.
+* `encrypt_data(api_response, secret_name, secret_key, kms_id, rsa_padding)`: Encrypts the provided data (`api_response`) using hybrid encryption (AES for data, RSA for session key), then Base64-encodes the encrypted result. 🛡️
+* `decrypt_data(encrypted_data, encrypted_key, secret_name, secret_key, kms_id, rsa_padding)`: Decrypts the Base64-encoded encrypted data using RSA and AES to restore the original data. 🔑
 
-### KMS (Key Management System) Module
+### KMS (Key Management System) Module ☁️
 
-This module integrates with AWS Key Management Service (KMS) to provide secure encryption and
-decryption of data, leveraging AWS's managed encryption keys.
+This module integrates with AWS Key Management Service (KMS) to securely encrypt and decrypt data, leveraging AWS's managed encryption keys.
 
 **Functions:**
 
-* `encrypt(plaintext, kms_id)`: Encrypts a plaintext string (`plaintext`) using AWS KMS and returns
-  the encrypted value as a Base64-encoded string.
-* `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted, Base64-encoded string
-  (`encrypted_value`) using the specified KMS key (kms_id).
+* `encrypt(plaintext, kms_id)`: Encrypts a plaintext string (`plaintext`) using AWS KMS and returns the encrypted value as a Base64-encoded string. 🔐
+* `decrypt(encrypted_value, kms_id)`: Decrypts a KMS-encrypted, Base64-encoded string (`encrypted_value`) using the specified KMS key (`kms_id`). 🔓
 
-### Secrets Manager Module
+### Secrets Manager Module 🗝️
 
-This module interacts with AWS Secrets Manager to securely retrieve and decrypt sensitive
-information, such as secrets and credentials, ensuring they are handled safely.
+This module interacts with AWS Secrets Manager to securely retrieve and decrypt sensitive information like secrets and credentials.
 
 **Functions:**
 
-* `retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts a secret
-  key from AWS Secrets Manager, utilizing AWS KMS for decryption.
-* `retrieve_secret_key(secret_name, secret_key)`: Retrieves a specific key stored in AWS Secrets
-  Manager without decrypting it.
-* `get_secrets(ciphertext, kms_id)`: Retrieves a specific secret stored in AWS Secrets Manager
-  and decrypts it using the provided KMS key (kms_id).
+* `retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)`: Retrieves and decrypts a secret key from AWS Secrets Manager using AWS KMS. 🔐
+* `retrieve_secret_key(secret_name, secret_key)`: Retrieves a secret key from AWS Secrets Manager without decrypting it. 🛡️
+* `get_secrets(ciphertext, kms_id)`: Retrieves and decrypts a specific secret from AWS Secrets Manager using the provided KMS key (`kms_id`). 🔑
 
-## Installation
+## Installation 🚀
 
-To install the Cryptorix package, use pip:
+To install the **Cryptorix** package, simply use **pip**:
 
 ```bash
 pip install Cryptorix
 ```
 
-## Usage
+Get started with secure encryption in no time! 🔐💻
 
-Here is a basic example of how to use the package:
+
+## Usage ✨
+
+Here is a basic example of how to use the **Cryptorix** package:
 
 ### 🔐 AES Encryption:
 
@@ -155,10 +149,9 @@ except Exception as error:
     print(f"❌ Decryption Error: {error}")
 ```
 
-### 🔐 JWE  Encryption:
+### 🔐 JWE Encryption:
 
-Encrypts a dictionary payload using AES-GCM for content encryption and RSA to encrypt the AES key.
-Key materials are securely retrieved via AWS KMS and Secrets Manager.
+Encrypts a dictionary payload using AES-GCM for content encryption and RSA to encrypt the AES key. Key materials are securely retrieved via AWS KMS and Secrets Manager.
 
 ```python
 from Cryptorix.jwe import encrypt
@@ -190,8 +183,7 @@ except Exception as error:
 
 ### 🔓 JWE Decryption:
 
-Decrypts the JWE token back into its original dictionary form using the corresponding RSA private
-key.
+Decrypts the JWE token back into its original dictionary form using the corresponding RSA private key.
 
 ```python
 from Cryptorix.jwe import decrypt
@@ -219,8 +211,7 @@ except Exception as error:
 
 ### 🔐 Hybrid Encryption:
 
-Encrypt sensitive data using hybrid encryption: AES-GCM for content encryption and
-RSA (via AWS KMS and Secrets Manager) for encrypting the AES key.
+Encrypt sensitive data using hybrid encryption: AES-GCM for content encryption and RSA (via AWS KMS and Secrets Manager) for encrypting the AES key.
 
 ```python
 from Cryptorix.hybrid import encrypt
@@ -290,8 +281,7 @@ except Exception as error:
 
 ### 🔐 KMS Encryption:
 
-Encrypt a plaintext string using AWS Key Management Service (KMS).
-The result is a base64-encoded encrypted value.
+Encrypt a plaintext string using AWS Key Management Service (KMS). The result is a base64-encoded encrypted value.
 
 ```python
 from Cryptorix.kms import encrypt
@@ -388,48 +378,59 @@ except Exception as error:
     print(f"❌ Error retrieving secrets: {error}")
 ```
 
-### Exceptions
+### 🚨 **Exceptions** in Cryptorix
 
-Cryptorix provides custom exceptions for error handling:
+Cryptorix defines custom exceptions to handle specific errors during encryption, decryption, and secret retrieval operations:
 
-* **HybridEncryptionError**: Raised during hybrid encryption/decryption failures.
-* **JWEError**: Raised during JWE encryption/decryption failures.
-* **KMSDecryptionError**: Raised if decryption via AWS KMS fails.
-* **KMSEncryptionError**: Raised if encryption via AWS KMS fails.
-* **SecretRetrievalError**: Raised if secrets cannot be retrieved or decrypted from AWS Secrets
-  Manager.
+* **🔐 HybridEncryptionError**: Raised when hybrid encryption or decryption fails.
+* **🔑 JWEError**: Raised during failures in JWE encryption or decryption.
+* **🔓 KMSDecryptionError**: Raised if decryption via AWS KMS fails.
+* **🔒 KMSEncryptionError**: Raised if encryption via AWS KMS fails.
+* **🔐 SecretRetrievalError**: Raised if secrets cannot be retrieved or decrypted from AWS Secrets Manager.
 
-This will capture all error-level logs related to encryption and decryption operations.
+These exceptions help track and handle errors efficiently during encryption/decryption tasks.
 
-## AWS Permissions
+---
 
-Ensure the following permissions are assigned to your AWS IAM role or user:
+### ⚙️ **AWS Permissions**
 
-* KMS Permissions:
-    * `kms:Encrypt`
-    * `kms:Decrypt`
-* Secrets Manager Permissions:
-    * `secretsmanager:GetSecretValue`
+Make sure your AWS IAM role or user has the following permissions for proper functionality:
 
-## Dependencies
+* **KMS Permissions**:
 
-The package requires the following dependencies:
+  * `kms:Encrypt` 🔐
+  * `kms:Decrypt` 🔓
 
-* [`jwcrypto`](https://pypi.org/project/jwcrypto/): Implementation of JOSE Web standards.
-* [`pycryptodome`](https://pypi.org/project/pycryptodome/): Cryptographic library for Python.
-* [`boto3`](https://pypi.org/project/boto3/): AWS SDK for Python.
+* **Secrets Manager Permissions**:
 
-## License
+  * `secretsmanager:GetSecretValue` 🔑
 
-This project is licensed under the MIT License.
+These permissions ensure you can encrypt, decrypt, and securely manage secrets using AWS services.
 
-## Contributing
+### 📦 **Dependencies**
 
-Contributions are welcome! Submit issues or pull requests to enhance the package. For major changes,
-please open a discussion first.
+Cryptorix requires the following libraries for its functionality:
 
-## Authors
+* **[`jwcrypto`](https://pypi.org/project/jwcrypto/)**: Implementation of JOSE Web standards for secure token handling.
+* **[`pycryptodome`](https://pypi.org/project/pycryptodome/)**: A powerful cryptographic library for Python.
+* **[`boto3`](https://pypi.org/project/boto3/)**: AWS SDK for Python, essential for integrating with AWS services like KMS and Secrets Manager.
 
-M Santhosh Kumar
-Initial work
-santhoshse7en@gmail.com
+---
+
+### 📄 **License**
+
+This project is licensed under the **MIT License**.
+
+---
+
+### 💡 **Contributing**
+
+Contributions are encouraged! You can submit issues or pull requests to improve the package. For major changes, please initiate a discussion first.
+
+---
+
+### 🖋️ **Authors**
+
+* **M Santhosh Kumar**
+  Initial work
+  Email: [santhoshse7en@gmail.com](mailto:santhoshse7en@gmail.com)
