@@ -1,138 +1,80 @@
 import json
 import os
-from typing import Dict
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from Cryptorix.exceptions import EncryptionError
-from Cryptorix.kms import decrypt
+from .exceptions import CryptorixError, SecretManagerError
 
-# Set default AWS region, falling back to "ap-south-1" if not set
+__all__ = ["get_secret_dict", "get_secret_value"]
+
+# Initialize the Secrets Manager client
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-
-# Initialize AWS clients
-secret_manager_client = boto3.client(service_name="secretsmanager", region_name=REGION_NAME)
-kms_client = boto3.client(service_name="kms", region_name=REGION_NAME)
+secret_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
 
 
-def _handle_error(error: Exception, function_name: str, context: Dict) -> None:
-    """Helper function for consistent error handling."""
-    raise EncryptionError(
-        error=str(error),
-        error_code="SECRET_OPERATION_FAILED",
-        function_name=function_name,
-        context=context
-    ) from error
-
-
-def get_secrets(secret_name: str) -> Dict[str, str]:
+def get_secret_dict(secret_name: str) -> dict[str, str]:
     """
-    Fetch and parse the secret from AWS Secrets Manager.
+    Fetch the full secret from AWS Secrets Manager and parse it as a dictionary.
 
     Args:
-        secret_name (str): The name or ARN of the secret in Secrets Manager.
+        secret_name (str): The secret name or full ARN.
 
     Returns:
-        dict: The parsed secret as a dictionary.
+        Dict[str, str]: Parsed secret.
 
     Raises:
-        EncryptionError: If retrieval or parsing of the secret fails.
+        SecretManagerError: On retrieval or parsing failure.
     """
     try:
         response = secret_manager_client.get_secret_value(SecretId=secret_name)
-        secret_string = response.get("SecretString", "{}").strip()
+        secret_string = response.get("SecretString")
 
         if not secret_string:
-            raise EncryptionError(
-                error=f"The secret '{secret_name}' is empty or malformed.",
-                error_code="EMPTY_SECRET",
-                function_name="_get_secret_value",
-                context={"secret_name": secret_name}
-            )
+            raise SecretManagerError(f"Secret '{secret_name}' is empty or missing.")
 
         return json.loads(secret_string)
-    except (ClientError, BotoCoreError) as aws_error:
-        _handle_error(
-            error=aws_error,
-            function_name="_get_secret_value",
-            context={"secret_name": secret_name}
-        )
-    except json.JSONDecodeError as json_error:
-        _handle_error(
-            error=json_error,
-            function_name="_get_secret_value",
-            context={"secret_name": secret_name}
-        )
+
+    except CryptorixError:
+        raise
+    except (BotoCoreError, ClientError, json.JSONDecodeError) as e:
+        raise SecretManagerError(f"Failed to retrieve secret '{secret_name}': {e}") from e
 
 
-def retrieve_secret_key(secret_name: str, secret_key: str) -> str:
+def get_secret_value(secret_name: str, key: str) -> str:
     """
-    Retrieve a specific key from a secret in AWS Secrets Manager.
+    Retrieve a specific key's value from a secret in AWS Secrets Manager.
 
     Args:
-        secret_name (str): The name or ARN of the secret in Secrets Manager.
-        secret_key (str): The key within the secret to retrieve.
+        secret_name (str): The secret name or ARN.
+        key (str): The key within the secret to fetch.
 
     Returns:
-        str: The decrypted RSA key as plaintext.
+        str: Value associated with the key.
 
     Raises:
-        EncryptionError: If the secret or key is not found or any error occurs.
+        SecretManagerError: If key is missing or retrieval fails.
     """
     try:
-        secret_dict = get_secrets(secret_name)
-        plain_text = secret_dict.get(secret_key)
+        secret = get_secret_dict(secret_name)
+        value = secret.get(key)
 
-        if not plain_text:
-            raise EncryptionError(
-                error=f"Key '{secret_key}' not found in secret '{secret_name}'.",
-                error_code="KEY_NOT_FOUND",
-                function_name="retrieve_secret_key",
-                context={"secret_name": secret_name, "secret_key": secret_key}
-            )
+        if not value:
+            raise SecretManagerError(f"Key '{key}' not found or empty in secret '{secret_name}'.")
 
-        return plain_text
-    except Exception as error:
-        _handle_error(
-            error=error,
-            function_name="retrieve_secret_key",
-            context={"secret_name": secret_name, "secret_key": secret_key}
-        )
+        return value
+    except SecretManagerError:
+        raise
+    except Exception as e:
+        raise SecretManagerError(
+            f"Failed to retrieve key '{key}' from secret '{secret_name}': {e}") from e
 
 
-def retrieve_decrypted_secret_key(secret_name: str, secret_key: str, kms_id: str) -> str:
-    """
-    Retrieve and decrypt the RSA key from AWS Secrets Manager using KMS.
-
-    Args:
-        secret_name (str): The name or ARN of the secret in Secrets Manager.
-        secret_key (str): The specific key within the secret to decrypt.
-        kms_id (str): The KMS Key ID used for decryption.
-
-    Returns:
-        str: The decrypted RSA key as a plaintext string.
-
-    Raises:
-        EncryptionError: If retrieval or decryption fails.
-    """
-    try:
-        secret_dict = get_secrets(secret_name)
-        ciphertext = secret_dict.get(secret_key)
-
-        if not ciphertext:
-            raise EncryptionError(
-                error=f"Key '{secret_key}' not found in secret '{secret_name}'.",
-                error_code="KEY_NOT_FOUND",
-                function_name="retrieve_decrypted_secret_key",
-                context={"secret_name": secret_name, "secret_key": secret_key}
-            )
-
-        # Decrypt the ciphertext using AWS KMS
-        return decrypt(encrypted_value=ciphertext, kms_id=kms_id)
-    except Exception as error:
-        _handle_error(error, "retrieve_decrypted_secret_key", {
-            "secret_name": secret_name,
-            "secret_key": secret_key,
-            "kms_id": kms_id
-        })
+def __dir__():
+    return sorted(
+        name for name in globals()
+        if name not in {
+            "json", "os", "boto3", "BotoCoreError", "ClientError", "REGION_NAME",
+            "secret_manager_client"
+        }
+    )

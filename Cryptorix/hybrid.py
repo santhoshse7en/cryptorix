@@ -7,192 +7,201 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
-from Cryptorix.exceptions import EncryptionError
-from Cryptorix.secrets import retrieve_decrypted_secret_key, retrieve_secret_key
+from Cryptorix.exceptions import (
+    CryptorixError,
+    KeyFormatError,
+    EncryptionError,
+    DecryptionError,
+    UnsupportedAlgorithmError
+)
 
-# RSA padding types
-RSA_MODES = {
+__all__ = ["encrypt", "decrypt"]
+
+# RSA padding strategy mapping
+RSA_PADDING_MODES = {
     "PKCS1_v1_5": PKCS1_v1_5,
     "PKCS1_OAEP": PKCS1_OAEP,
 }
 
 
 def encrypt(
-        api_response: dict,
-        secret_name: str,
-        secret_key: str,
-        kms_id: str = None,
+        data: dict,
+        public_key_pem: str,
         rsa_padding: str = "PKCS1_OAEP",
 ) -> dict:
     """
-    Encrypts data using a hybrid encryption scheme.
+    Encrypts data using RSA + AES hybrid encryption.
+
+    Args:
+        data (dict): The data to encrypt.
+        public_key_pem (str): RSA public key in PEM format.
+        rsa_padding (str): Padding mode: 'PKCS1_OAEP' (default) or 'PKCS1_v1_5'.
+
+    Returns:
+        dict: Base64-encoded encrypted AES key and encrypted payload.
+
+    Raises:
+        KeyFormatError: If the public key is invalid.
+        EncryptionError: If encryption fails.
+        UnsupportedAlgorithmError: If the padding is unsupported.
     """
     try:
-        # Generate AES session key and IV
         aes_key = get_random_bytes(16)
         iv = get_random_bytes(16)
 
-        # Load RSA key securely
-        rsa_key = _load_rsa_key(secret_name, secret_key, kms_id)
+        try:
+            rsa_key = RSA.import_key(public_key_pem)
+        except Exception as e:
+            raise KeyFormatError(f"Invalid RSA public key: {e}") from e
 
-        # Encrypt AES session key with RSA
-        encrypted_aes_key, aes_mode = _encrypt_aes_key(rsa_key, rsa_padding, aes_key)
+        encrypted_key, aes_mode = _encrypt_aes_key(rsa_key, rsa_padding, aes_key)
 
-        # AES encrypt payload
-        cipher_aes = _initialize_aes_cipher(aes_key, iv, aes_mode)
-        plaintext_bytes = pad(json.dumps(api_response).encode(), AES.block_size)
-        ciphertext = cipher_aes.encrypt(plaintext_bytes)
+        cipher = _init_aes_cipher(aes_key, iv, aes_mode)
+        padded_data = pad(json.dumps(data).encode(), AES.block_size)
+        encrypted_data = cipher.encrypt(padded_data)
 
-        # Return response
         return {
-            "encrypted_data": base64.b64encode(iv + ciphertext).decode("utf-8"),
-            "encrypted_key": base64.b64encode(encrypted_aes_key).decode("utf-8"),
+            "encrypted_data": base64.b64encode(iv + encrypted_data).decode(),
+            "encrypted_key": base64.b64encode(encrypted_key).decode(),
         }
-
-    except Exception as error:
-        raise EncryptionError(
-            error=str(error),
-            error_code="ENCRYPTION_FAILED",
-            function_name="encrypt",
-            context={"secret_name": secret_name, "kms_id": kms_id}
-        ) from error
+    except CryptorixError:
+        raise
+    except Exception as e:
+        raise EncryptionError(f"Hybrid encryption failed: {e}") from e
 
 
 def decrypt(
         encrypted_data: str,
         encrypted_key: str,
-        secret_name: str,
-        secret_key: str,
-        kms_id: str = None,
-        rsa_padding: str = "PKCS1_OAEP"
+        private_key_pem: str,
+        rsa_padding: str = "PKCS1_OAEP",
 ) -> dict:
     """
-    Decrypts data using a hybrid encryption mechanism.
+    Decrypts data using RSA + AES hybrid decryption.
+
+    Args:
+        encrypted_data (str): Base64-encoded encrypted payload.
+        encrypted_key (str): Base64-encoded encrypted AES key.
+        private_key_pem (str): RSA private key in PEM format.
+        rsa_padding (str): Padding mode: 'PKCS1_OAEP' (default) or 'PKCS1_v1_5'.
+
+    Returns:
+        dict: Original decrypted payload.
+
+    Raises:
+        KeyFormatError: If the private key is invalid.
+        DecryptionError: If decryption fails.
+        UnsupportedAlgorithmError: If the padding is unsupported.
     """
     try:
-        # Decode Base64 inputs
         encrypted_data_bytes = base64.b64decode(encrypted_data)
         encrypted_key_bytes = base64.b64decode(encrypted_key)
 
-        # Extract IV and ciphertext
         iv, ciphertext = encrypted_data_bytes[:16], encrypted_data_bytes[16:]
 
-        # Load RSA key securely
-        rsa_key = _load_rsa_key(secret_name, secret_key, kms_id)
+        try:
+            rsa_key = RSA.import_key(private_key_pem)
+        except Exception as e:
+            raise KeyFormatError(f"Invalid RSA private key: {e}") from e
 
-        # Decrypt AES session key
         aes_key, aes_mode = _decrypt_aes_key(rsa_key, encrypted_key_bytes, rsa_padding)
 
-        # Initialize AES cipher
-        cipher_aes = _initialize_aes_cipher(aes_key, iv, aes_mode)
-        plaintext_bytes = cipher_aes.decrypt(ciphertext)
+        cipher = _init_aes_cipher(aes_key, iv, aes_mode)
+        decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
 
-        # Remove padding and Decode the result
-        plaintext_bytes = unpad(plaintext_bytes, AES.block_size)
-        return json.loads(plaintext_bytes.decode("utf-8"))
+        return json.loads(decrypted.decode())
 
-    except Exception as error:
-        raise EncryptionError(
-            error=str(error),
-            error_code="DECRYPTION_FAILED",
-            function_name="decrypt",
-            context={
-                "secret_name": secret_name,
-                "kms_id": kms_id,
-                "encrypted_key": encrypted_key[:30] + "...",  # Mask long values for logs
-                "encrypted_data": encrypted_data[:30] + "..."  # Mask long values for logs
-            }
-        ) from error
-
-
-def _load_rsa_key(secret_name: str, secret_key: str, kms_id: str) -> RSA.RsaKey:
-    """
-    Retrieves and validates the RSA key from a secrets manager.
-    """
-    try:
-        if kms_id:
-            key_pem = retrieve_decrypted_secret_key(secret_name, secret_key, kms_id)
-        else:
-            key_pem = retrieve_secret_key(secret_name, secret_key)
-        return RSA.import_key(key_pem)
+    except CryptorixError:
+        raise
     except Exception as e:
-        raise EncryptionError(
-            error="Invalid RSA key or failed fetch",
-            error_code="RSA_LOAD_ERROR",
-            context={"secret_name": secret_name, "kms_id": kms_id}
-        ) from e
+        raise DecryptionError(f"Hybrid decryption failed: {e}") from e
 
 
 def _encrypt_aes_key(
         rsa_key: RSA.RsaKey,
-        rsa_padding: str,
-        aes_key: bytes
+        padding: str,
+        aes_key: bytes,
 ) -> Tuple[bytes, str]:
     """
-    Encrypts the AES session key using RSA with the selected padding scheme.
+    Encrypts AES key using RSA with the given padding.
+
+    Returns:
+        Tuple[bytes, str]: Encrypted AES key, AES mode.
+
+    Raises:
+        UnsupportedAlgorithmError: If the padding is not supported.
     """
-    try:
-        if rsa_padding not in RSA_MODES:
-            raise ValueError("Unsupported RSA padding type. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
+    if padding not in RSA_PADDING_MODES:
+        raise UnsupportedAlgorithmError(
+            "Unsupported RSA padding. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
 
-        # Dynamically load the RSA cipher mode
-        cipher = RSA_MODES[rsa_padding].new(rsa_key)
-        encrypted_aes_key = cipher.encrypt(aes_key)
+    cipher = RSA_PADDING_MODES[padding].new(rsa_key)
+    encrypted_key = cipher.encrypt(aes_key)
 
-        # Return the encrypted AES session key and the corresponding AES mode
-        return encrypted_aes_key, "CBC" if rsa_padding == "PKCS1_v1_5" else "GCM"
-    except Exception as e:
-        raise EncryptionError(
-            error="Failed to encrypt AES key",
-            error_code="RSA_AES_KEY_ENCRYPT_FAILED",
-            context={"rsa_padding": rsa_padding}
-        ) from e
+    return encrypted_key, "CBC" if padding == "PKCS1_v1_5" else "GCM"
 
 
 def _decrypt_aes_key(
         rsa_key: RSA.RsaKey,
-        encrypted_aes_key: bytes,
-        rsa_padding: str
+        encrypted_key: bytes,
+        padding: str,
 ) -> Tuple[bytes, str]:
     """
-    Decrypts the AES session key using RSA with the selected padding scheme.
+    Decrypts AES key using RSA with the given padding.
+
+    Returns:
+        Tuple[bytes, str]: Decrypted AES key, AES mode.
+
+    Raises:
+        UnsupportedAlgorithmError: If the padding is not supported.
+        DecryptionError: If the AES key cannot be decrypted.
     """
-    try:
-        if rsa_padding not in RSA_MODES:
-            raise ValueError("Unsupported RSA padding type. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
+    if padding not in RSA_PADDING_MODES:
+        raise UnsupportedAlgorithmError(
+            "Unsupported RSA padding. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
 
-        # Dynamically load the RSA decryption mode
-        cipher = RSA_MODES[rsa_padding].new(rsa_key)
+    cipher = RSA_PADDING_MODES[padding].new(rsa_key)
 
-        if rsa_padding == "PKCS1_v1_5":
-            # Handle PKCS1_v1_5 mode with sentinel
-            decrypted_aes_key = cipher.decrypt(encrypted_aes_key, None)
-        else:  # For PKCS1_OAEP or others, decrypt normally
-            decrypted_aes_key = cipher.decrypt(encrypted_aes_key)
+    decrypted_key = (
+        cipher.decrypt(encrypted_key, None)
+        if padding == "PKCS1_v1_5"
+        else cipher.decrypt(encrypted_key)
+    )
 
-        if decrypted_aes_key is None:
-            raise EncryptionError(
-                error="RSA decryption failed.",
-                error_code="RSA_AES_KEY_DECRYPT_FAILED",
-                context={"rsa_padding": rsa_padding}
-            )
+    if not decrypted_key:
+        raise DecryptionError("AES key decryption failed.")
 
-        # Return the decrypted AES key and its respective mode
-        return decrypted_aes_key, "CBC" if rsa_padding == "PKCS1_v1_5" else "GCM"
-    except Exception as e:
-        raise EncryptionError(
-            error="Failed to decrypt AES session key",
-            error_code="RSA_AES_KEY_DECRYPT_FAILED",
-            context={"rsa_padding": rsa_padding}
-        ) from e
+    return decrypted_key, "CBC" if padding == "PKCS1_v1_5" else "GCM"
 
 
-def _initialize_aes_cipher(aes_key: bytes, iv: bytes, aes_mode: str):
+def _init_aes_cipher(aes_key: bytes, iv: bytes, mode: str) -> AES:
     """
-    Initializes the AES cipher instance.
+    Initializes AES cipher.
+
+    Args:
+        aes_key (bytes): AES session key.
+        iv (bytes): Initialization vector or nonce.
+        mode (str): AES mode - 'GCM' or 'CBC'.
+
+    Returns:
+        AES cipher object.
+
+    Raises:
+        UnsupportedAlgorithmError: If the AES mode is not supported.
     """
-    if aes_mode == "GCM":
+    if mode == "GCM":
         return AES.new(aes_key, AES.MODE_GCM, nonce=iv)
-    if aes_mode == "CBC":
+    elif mode == "CBC":
         return AES.new(aes_key, AES.MODE_CBC, iv)  # NOSONAR
-    raise ValueError("Unsupported AES mode. Use 'GCM' or 'CBC'.")
+    else:
+        raise UnsupportedAlgorithmError("Unsupported AES mode. Use 'GCM' or 'CBC'.")
+
+
+def __dir__():
+    return sorted(
+        name for name in globals()
+        if name not in {
+            "base64", "json", "Tuple", "AES", "PKCS1_OAEP", "PKCS1_v1_5", "RSA",
+            "get_random_bytes", "pad", "unpad", "RSA_PADDING_MODES"
+        }
+    )

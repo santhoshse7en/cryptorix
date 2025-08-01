@@ -1,4 +1,6 @@
 boto3
+botocore
+cryptography
 jwcrypto
 pycryptodome
 setuptools

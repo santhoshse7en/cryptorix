@@ -4,96 +4,70 @@ from base64 import b64decode, b64encode
 from typing import Union
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
-from Cryptorix.exceptions import EncryptionError
+from .exceptions import EncryptionError, DecryptionError
 
-# Set default AWS region, falling back to "ap-south-1" if not set
+__all__ = ["encrypt", "decrypt"]
+
+# Set default AWS region
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-
-# Initialize the AWS KMS client
-kms_client = boto3.client(service_name="kms", region_name=REGION_NAME)
+kms_client = boto3.client("kms", region_name=REGION_NAME)
 
 
-def encrypt(plaintext: str, kms_id: str) -> str:
+def encrypt(plaintext: str, kms_key_id: str) -> str:
     """
-    Encrypts a plaintext string using AWS KMS.
+    Encrypt a plaintext string using AWS KMS and return a base64-encoded ciphertext.
 
     Args:
-        plaintext (str): The plaintext string to encrypt.
-        kms_id (str): The KMS Key ID used for encryption.
+        plaintext (str): Plaintext to encrypt.
+        kms_key_id (str): AWS KMS Key ID or ARN.
 
     Returns:
-        str: The encrypted value as a base64-encoded string.
+        str: Base64-encoded encrypted string.
 
     Raises:
-        EncryptionError: If the encryption process fails.
+        EncryptionError: If encryption fails.
     """
     try:
-        # Encrypt the plaintext using KMS and get the encrypted blob
-        encrypted_response = kms_client.encrypt(
-            KeyId=kms_id,
+        response = kms_client.encrypt(
+            KeyId=kms_key_id,
             Plaintext=plaintext.encode("utf-8")
         )
-        return b64encode(encrypted_response["CiphertextBlob"]).decode("utf-8")
-    except Exception as error:
-        # Handle encryption error with relevant context
-        raise EncryptionError(
-            error=f"Failed to encrypt data: {error}",
-            error_code="ENCRYPTION_ERROR",
-            function_name="encrypt",
-            context={"kms_id": kms_id}
-        ) from error
+        encrypted_blob = response["CiphertextBlob"]
+        return b64encode(encrypted_blob).decode("utf-8")
+    except (BotoCoreError, ClientError) as e:
+        raise EncryptionError(f"KMS encryption failed: {e}") from e
 
 
-def decrypt(encrypted_value: str, kms_id: str) -> Union[dict, str]:
+def decrypt(ciphertext_b64: str) -> Union[str, dict]:
     """
-    Decrypts a KMS-encrypted base64-encoded string.
+    Decrypt a base64-encoded ciphertext using AWS KMS.
 
     Args:
-        encrypted_value (str): The base64-encoded encrypted string to decrypt.
-        kms_id (str): The KMS Key ID used for decryption.
+        ciphertext_b64 (str): Base64-encoded encrypted string.
 
     Returns:
-        Union[dict, str]: The decrypted value as a dictionary or string.
+        Union[str, dict]: Decrypted plaintext or parsed JSON dictionary.
 
     Raises:
-        EncryptionError: If the decryption process fails.
+        DecryptionError: If decryption fails.
     """
     try:
-        # Decode the encrypted value and decrypt using KMS
         decrypted_response = kms_client.decrypt(
-            KeyId=kms_id,
-            CiphertextBlob=b64decode(encrypted_value)
+            CiphertextBlob=b64decode(ciphertext_b64)
         )
-        # Parse the decrypted plaintext
-        return __parse_output(decrypted_response["Plaintext"].decode("utf-8"))
-    except Exception as error:
-        # Handle decryption error with relevant context
-        raise EncryptionError(
-            error=f"Failed to decrypt data: {error}",
-            error_code="DECRYPTION_ERROR",
-            function_name="decrypt",
-            context={
-                "kms_id": kms_id,
-                "encrypted_value": encrypted_value[:30] + "..."  # Mask long encrypted data
-            }
-        ) from error
+        plaintext = decrypted_response["Plaintext"].decode("utf-8")
+        return json.loads(plaintext) if plaintext.strip().startswith("{") else plaintext
+    except (BotoCoreError, ClientError, json.JSONDecodeError) as e:
+        raise DecryptionError(f"KMS decryption failed: {e}") from e
 
 
-def __parse_output(response: str) -> Union[dict, str]:
-    """
-    Parses the decrypted response into a dictionary if it is JSON,
-    otherwise returns the original string.
-
-    Args:
-        response (str): The decrypted response string.
-
-    Returns:
-        Union[dict, str]: Parsed dictionary or the original string if not a valid JSON.
-    """
-    try:
-        # Attempt to parse the response as JSON
-        return json.loads(response) if response.strip().startswith("{") else response
-    except json.JSONDecodeError:
-        # If not a valid JSON, return as a string
-        return response
+def __dir__():
+    return sorted(
+        name for name in globals()
+        if name not in {
+            "b64decode", "b64encode", "boto3", "Union", "json", "os",
+            "BotoCoreError", "ClientError", "REGION_NAME", "kms_client"
+        }
+    )

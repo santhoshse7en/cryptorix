@@ -1,103 +1,137 @@
 import base64
-import binascii
 import json
+import secrets
 
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from Cryptorix.exceptions import EncryptionError
+from .exceptions import (
+    CryptorixError,
+    EncryptionError,
+    DecryptionError,
+    KeyFormatError
+)
+
+__all__ = ["encrypt", "decrypt", "generate_key"]
 
 
-def encrypt(api_response: dict, aes_key: str) -> str:
+def generate_key() -> str:
+    """Generates a 256-bit (32-byte) AES key in hex format."""
+    return secrets.token_hex(32)
+
+
+def encrypt(data: dict | str, hex_key: str) -> str:
     """
-    Encrypts a plaintext dictionary using AES-GCM.
+    Encrypts a dictionary or string using AES-GCM and returns base64-encoded ciphertext.
 
     Args:
-        api_response (dict): The plaintext dictionary to encrypt.
-        aes_key (str): The AES key as a hex string.
+        data (dict | str): Data to encrypt.
+        hex_key (str): Hex-encoded AES key (128/192/256-bit).
 
     Returns:
-        str: The base64-encoded encrypted value.
+        str: Encrypted base64-encoded string.
 
     Raises:
-        EncryptionError: If the encryption process fails.
+        TypeError: If input is not a dictionary or string.
+        KeyFormatError: If AES key is invalid.
+        EncryptionError: For general encryption failures.
     """
+    if not isinstance(data, (dict, str)):
+        raise TypeError("Input data must be a dictionary or string.")
+
     try:
-        iv = get_random_bytes(12)  # 12-byte IV for AES-GCM
-        plain_bytes = json.dumps(api_response).encode("utf-8")
+        key = _decode_aes_key(hex_key)
+        iv = get_random_bytes(12)
+        plaintext = json.dumps(data).encode("utf-8")
 
-        cipher = AES.new(_decode_aes_key(aes_key), AES.MODE_GCM, nonce=iv)
-        ciphertext, tag = cipher.encrypt_and_digest(plain_bytes)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        ciphertext, tag = cipher.encrypt_and_digest(plaintext)
 
-        # Concatenate iv, ciphertext, and tag, then base64 encode
-        encrypted_data = base64.b64encode(iv + ciphertext + tag).decode("utf-8")
-        return encrypted_data
-    except Exception as error:
-        raise EncryptionError(
-            error=f"Encryption failed: {str(error)}",
-            error_code="ENCRYPTION_ERROR",
-            function_name="encrypt",
-            context={"aes_key": "***MASKED***"}
-        ) from error
+        encrypted = iv + ciphertext + tag
+        return base64.b64encode(encrypted).decode("utf-8")
+
+    except ValueError as e:
+        raise KeyFormatError(f"Invalid AES key: {e}") from e
+    except Exception as e:
+        raise EncryptionError(f"Encryption failed: {e}") from e
 
 
-def decrypt(encrypted_data: str, aes_key: str) -> dict:
+def decrypt(encrypted_data: str, hex_key: str) -> dict:
     """
-    Decrypts an AES-GCM encrypted base64-encoded string.
+    Decrypts a base64-encoded AES-GCM encrypted string.
 
     Args:
-        encrypted_data (str): The base64-encoded encrypted string.
-        aes_key (str): The AES key as a hex string.
+        encrypted_data (str): Base64-encoded ciphertext.
+        hex_key (str): Hex-encoded AES key.
 
     Returns:
-        dict: The decrypted plaintext dictionary.
+        dict: Decrypted data.
 
     Raises:
-        EncryptionError: If the decryption process fails.
+        KeyFormatError: If the key format is invalid.
+        DecryptionError: If decryption fails.
     """
     try:
-        encrypted_data_bytes = base64.b64decode(encrypted_data, validate=True)
+        encrypted_bytes = base64.b64decode(encrypted_data, validate=True)
+    except Exception as e:
+        raise DecryptionError(f"Invalid base64 input: {e}") from e
 
-        # Extract IV, ciphertext, and tag from the encrypted data
-        iv, ciphertext, tag = (
-            encrypted_data_bytes[:12],
-            encrypted_data_bytes[12:-16],
-            encrypted_data_bytes[-16:]
+    if len(encrypted_bytes) < 28:
+        raise DecryptionError("Encrypted data is too short or corrupted.")
+
+    try:
+        iv = encrypted_bytes[:12]
+        tag = encrypted_bytes[-16:]
+        ciphertext = encrypted_bytes[12:-16]
+
+        key = _decode_aes_key(hex_key)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        decrypted_bytes = cipher.decrypt_and_verify(ciphertext, tag)
+
+        result = json.loads(decrypted_bytes.decode("utf-8"))
+
+        if not isinstance(result, dict):
+            raise DecryptionError("Decrypted content is not a dictionary.")
+
+        return result
+
+    except CryptorixError:
+        raise
+    except ValueError as e:
+        raise KeyFormatError(f"Invalid AES key: {e}") from e
+    except Exception as e:
+        raise DecryptionError(f"Decryption failed: {e}") from e
+
+
+def _decode_aes_key(hex_key: str) -> bytes:
+    """
+    Decodes and validates a hex-encoded AES key.
+
+    Args:
+        hex_key (str): Hex-encoded AES key.
+
+    Returns:
+        bytes: Decoded AES key.
+
+    Raises:
+        KeyFormatError: If the key is not valid or not the correct length.
+    """
+    try:
+        key_bytes = bytes.fromhex(hex_key)
+    except ValueError:
+        raise KeyFormatError("AES key must be a valid hexadecimal string.")
+
+    if len(key_bytes) not in (16, 24, 32):
+        raise KeyFormatError(
+            f"Invalid AES key length: {len(key_bytes) * 8} bits. "
+            "Supported lengths are 128, 192, or 256 bits."
         )
 
-        cipher = AES.new(_decode_aes_key(aes_key), AES.MODE_GCM, nonce=iv)
-        decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
-
-        return json.loads(decrypted_data.decode("utf-8"))
-    except Exception as error:
-        raise EncryptionError(
-            error=f"Decryption failed: {str(error)}",
-            error_code="DECRYPTION_ERROR",
-            function_name="decrypt",
-            context={"aes_key": "***MASKED***", "encrypted_data": encrypted_data[:30] + "..."}
-        ) from error
+    return key_bytes
 
 
-def _decode_aes_key(aes_key: str) -> bytes:
-    """
-    Decodes the AES key from a hex string to raw bytes.
-
-    Args:
-        aes_key (str): The AES key as a hex string.
-
-    Returns:
-        bytes: The decoded AES key (32 bytes).
-
-    Raises:
-        ValueError: If the key is invalid.
-    """
-    if not isinstance(aes_key, str):
-        raise ValueError("AES key must be a string.")
-
-    try:
-        decoded_key = binascii.unhexlify(aes_key)
-        if len(decoded_key) != 32:
-            raise ValueError("Invalid AES key length. Expected 32 bytes.")
-        return decoded_key
-    except binascii.Error as error:
-        raise ValueError(f"Invalid AES key: {error}")
+def __dir__():
+    return sorted(
+        name for name in globals()
+        if name not in {"base64", "json", "secrets", "AES", "get_random_bytes"}
+    )
