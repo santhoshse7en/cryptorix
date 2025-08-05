@@ -42,10 +42,12 @@ def encrypt(data: dict | str, hex_key: str) -> str:
     try:
         key = _decode_aes_key(hex_key)
         iv = get_random_bytes(12)
-        plaintext = json.dumps(data).encode("utf-8")
+
+        if isinstance(data, dict):
+            data = json.dumps(data)
 
         cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-        ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+        ciphertext, tag = cipher.encrypt_and_digest(data.encode("utf-8"))
 
         encrypted = iv + ciphertext + tag
         return base64.b64encode(encrypted).decode("utf-8")
