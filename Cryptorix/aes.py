@@ -58,7 +58,7 @@ def encrypt(data: dict | str, hex_key: str) -> str:
         raise EncryptionError(f"Encryption failed: {e}") from e
 
 
-def decrypt(encrypted_data: str, hex_key: str) -> dict:
+def decrypt(encrypted_data: str, hex_key: str) -> dict | str:
     """
     Decrypts a base64-encoded AES-GCM encrypted string.
 
@@ -67,7 +67,7 @@ def decrypt(encrypted_data: str, hex_key: str) -> dict:
         hex_key (str): Hex-encoded AES key.
 
     Returns:
-        dict: Decrypted data.
+        dict | str: Decrypted JSON object or plain string.
 
     Raises:
         KeyFormatError: If the key format is invalid.
@@ -90,10 +90,10 @@ def decrypt(encrypted_data: str, hex_key: str) -> dict:
         cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
         decrypted_bytes = cipher.decrypt_and_verify(ciphertext, tag)
 
-        result = json.loads(decrypted_bytes.decode("utf-8"))
-
-        if not isinstance(result, dict):
-            raise DecryptionError("Decrypted content is not a dictionary.")
+        try:
+            result = json.loads(decrypted_bytes.decode("utf-8"))
+        except json.JSONDecodeError:
+            result = decrypted_bytes.decode("utf-8")
 
         return result
 

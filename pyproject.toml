@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Cryptorix"
-version = "1.0.8"
+version = "1.0.9"
 description = "A Python package that provides robust encryption and decryption mechanisms, utilizing AES, FERNET, JWE, Hybrid Encryption, AWS KMS, and AWS Secrets Manager."
 authors = [
     { name = "M Santhosh Kumar", email = "santhoshse7en@gmail.com" }
