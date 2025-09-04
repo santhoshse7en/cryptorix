@@ -30,8 +30,8 @@ Encrypt and decrypt Python dictionaries with AES encryption.
 ```python
 from Cryptorix.aes import encrypt, decrypt
 
-encrypted = encrypt(data="your_data", hex_key="your_hex_key")
-decrypted = decrypt(encrypted_data=encrypted, hex_key="your_hex_key")
+encrypted = encrypt(data="your_data", aes_key="your_hex_key")
+decrypted = decrypt(encrypted_data=encrypted, aes_key="your_hex_key")
 ```
 
 ---

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Cryptorix"
-version = "1.0.9"
+version = "1.1.0"
 description = "A Python package that provides robust encryption and decryption mechanisms, utilizing AES, FERNET, JWE, Hybrid Encryption, AWS KMS, and AWS Secrets Manager."
 authors = [
     { name = "M Santhosh Kumar", email = "santhoshse7en@gmail.com" }
@@ -21,10 +21,10 @@ keywords = [
     "Encryption", "Decryption", "AWS", "Security", "Cryptography"
 ]
 dependencies = [
-    "cryptography>=45.0.5",
-    "jwcrypto>=1.0.0",
-    "pycryptodome>=3.10.0",
-    "boto3>=1.20.0"
+    "cryptography>=45.0.7",
+    "jwcrypto>=1.5.6",
+    "pycryptodome>=3.23.0",
+    "boto3>=1.40.23"
 ]
 
 [project.urls]
