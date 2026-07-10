@@ -1,8 +1,14 @@
 import json
 import os
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+except ImportError as e:
+    raise ImportError(
+        "Cryptorix.secrets requires the 'aws' extra. Install it with: "
+        "pip install cryptorix[aws]"
+    ) from e
 
 from .exceptions import CryptorixError, SecretManagerError
 
@@ -10,7 +16,14 @@ __all__ = ["get_secret_dict", "get_secret_value"]
 
 # Initialize the Secrets Manager client
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-secret_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
+_secret_manager_client = None
+
+
+def _get_client():
+    global _secret_manager_client
+    if _secret_manager_client is None:
+        _secret_manager_client = boto3.client("secretsmanager", region_name=REGION_NAME)
+    return _secret_manager_client
 
 
 def get_secret_dict(secret_name: str) -> dict[str, str]:
@@ -27,7 +40,7 @@ def get_secret_dict(secret_name: str) -> dict[str, str]:
         SecretManagerError: On retrieval or parsing failure.
     """
     try:
-        response = secret_manager_client.get_secret_value(SecretId=secret_name)
+        response = _get_client().get_secret_value(SecretId=secret_name)
         secret_string = response.get("SecretString")
 
         if not secret_string:
@@ -75,6 +88,6 @@ def __dir__():
         name for name in globals()
         if name not in {
             "json", "os", "boto3", "BotoCoreError", "ClientError", "REGION_NAME",
-            "secret_manager_client"
+            "_secret_manager_client", "_get_client"
         }
     )

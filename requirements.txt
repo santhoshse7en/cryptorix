@@ -1,7 +1,7 @@
+cryptography
 boto3
 botocore
-cryptography
 jwcrypto
-pycryptodome
+pytest
 setuptools
 wheel

@@ -25,6 +25,11 @@ class KeyFormatError(CryptorixError):
     pass
 
 
+class KeyDerivationError(CryptorixError):
+    """Raised when password/key derivation fails."""
+    pass
+
+
 class KMSClientError(CryptorixError):
     """Raised when KMS integration fails."""
     pass

@@ -1,6 +1,12 @@
 import json
 
-from jwcrypto import jwk, jwe
+try:
+    from jwcrypto import jwk, jwe
+except ImportError as e:
+    raise ImportError(
+        "Cryptorix.jwe requires the 'jwe' extra. Install it with: "
+        "pip install cryptorix[jwe]"
+    ) from e
 
 __all__ = ["encrypt", "decrypt"]
 

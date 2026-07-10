@@ -3,8 +3,7 @@ import json
 import secrets
 import string
 
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .exceptions import (
     CryptorixError,
@@ -56,14 +55,15 @@ def encrypt(data: dict | str, aes_key: str) -> str:
 
     try:
         key = _decode_aes_key(aes_key)
-        iv = get_random_bytes(12)
+        iv = secrets.token_bytes(12)
 
         plaintext = json.dumps(data) if isinstance(data, dict) else data
-        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-        ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode("utf-8"))
+        ciphertext_and_tag = AESGCM(key).encrypt(iv, plaintext.encode("utf-8"), None)
 
-        return base64.b64encode(iv + ciphertext + tag).decode("utf-8")
+        return base64.b64encode(iv + ciphertext_and_tag).decode("utf-8")
 
+    except CryptorixError:
+        raise
     except ValueError as e:
         raise KeyFormatError(f"Invalid AES key: {e}") from e
     except Exception as e:
@@ -95,12 +95,10 @@ def decrypt(encrypted_data: str, aes_key: str) -> dict | str:
 
     try:
         iv = encrypted_bytes[:12]
-        tag = encrypted_bytes[-16:]
-        ciphertext = encrypted_bytes[12:-16]
+        ciphertext_and_tag = encrypted_bytes[12:]
 
         key = _decode_aes_key(aes_key)
-        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-        decrypted_bytes = cipher.decrypt_and_verify(ciphertext, tag)
+        decrypted_bytes = AESGCM(key).decrypt(iv, ciphertext_and_tag, None)
 
         try:
             result = json.loads(decrypted_bytes.decode("utf-8"))
@@ -150,5 +148,5 @@ def _decode_aes_key(aes_key: str) -> bytes:
 def __dir__():
     return sorted(
         name for name in globals()
-        if name not in {"base64", "json", "string", "secrets", "AES", "get_random_bytes"}
+        if name not in {"base64", "json", "string", "secrets", "AESGCM"}
     )

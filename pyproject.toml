@@ -1,31 +1,44 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "Cryptorix"
-version = "1.1.0"
-description = "A Python package that provides robust encryption and decryption mechanisms, utilizing AES, FERNET, JWE, Hybrid Encryption, AWS KMS, and AWS Secrets Manager."
+version = "2.0.0"
+description = "A lightweight Python toolkit for AES, Fernet, JWE, hybrid RSA+AES encryption, format preserving encryption, Argon2id/scrypt/HKDF key derivation, AWS KMS, and AWS Secrets Manager."
 authors = [
     { name = "M Santhosh Kumar", email = "santhoshse7en@gmail.com" }
 ]
 license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent"
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Typing :: Typed"
 ]
 readme = "README.md"
 requires-python = ">=3.9"
 keywords = [
     "AES", "FERNET", "JWE", "Hybrid Encryption", "KMS", "Secrets Manager",
-    "Encryption", "Decryption", "AWS", "Security", "Cryptography"
+    "Encryption", "Decryption", "AWS", "Security", "Cryptography",
+    "Argon2", "Scrypt", "HKDF", "Key Derivation", "FPE", "Format Preserving Encryption",
+    "Tokenization"
 ]
 dependencies = [
-    "cryptography>=45.0.7",
-    "jwcrypto>=1.5.6",
-    "pycryptodome>=3.23.0",
-    "boto3>=1.40.23"
+    "cryptography>=45.0.7"
 ]
+
+[project.optional-dependencies]
+aws = ["boto3>=1.40.23"]
+jwe = ["jwcrypto>=1.5.6"]
+all = ["Cryptorix[aws,jwe]"]
+dev = ["pytest>=8.0", "Cryptorix[all]"]
 
 [project.urls]
 Documentation = "https://github.com/santhoshse7en/cryptorix#readme"
@@ -37,13 +50,13 @@ packages = ["Cryptorix"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-Cryptorix = ["*.py"]
+Cryptorix = ["py.typed"]
 
 [tool.black]
 line-length = 88
-target-version = ["py39", "py310", "py311", "py312", "py313"]
+target-version = ["py39", "py310", "py311", "py312", "py313", "py314"]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "8.0"
 addopts = "-ra -q"
 testpaths = ["tests"]

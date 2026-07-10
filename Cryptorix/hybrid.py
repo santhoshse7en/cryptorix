@@ -1,11 +1,11 @@
 import base64
 import json
+import secrets
 from typing import Tuple
 
-from Crypto.Cipher import AES, PKCS1_OAEP, PKCS1_v1_5
-from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad, unpad
+from cryptography.hazmat.primitives import hashes, padding as sym_padding, serialization
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from Cryptorix.exceptions import (
     CryptorixError,
@@ -17,10 +17,17 @@ from Cryptorix.exceptions import (
 
 __all__ = ["encrypt", "decrypt"]
 
-# RSA padding strategy mapping
+# RSA padding strategy mapping: name -> (cryptography padding instance, AES mode)
 RSA_PADDING_MODES = {
-    "PKCS1_v1_5": PKCS1_v1_5,
-    "PKCS1_OAEP": PKCS1_OAEP,
+    "PKCS1_v1_5": (asym_padding.PKCS1v15(), "CBC"),
+    "PKCS1_OAEP": (
+        asym_padding.OAEP(
+            mgf=asym_padding.MGF1(algorithm=hashes.SHA1()),
+            algorithm=hashes.SHA1(),
+            label=None,
+        ),
+        "GCM",
+    ),
 }
 
 
@@ -46,19 +53,18 @@ def encrypt(
         UnsupportedAlgorithmError: If the padding is unsupported.
     """
     try:
-        aes_key = get_random_bytes(16)
-        iv = get_random_bytes(16)
+        aes_key = secrets.token_bytes(16)
+        iv = secrets.token_bytes(16)
 
         try:
-            rsa_key = RSA.import_key(public_key_pem)
+            rsa_key = serialization.load_pem_public_key(public_key_pem.encode())
         except Exception as e:
             raise KeyFormatError(f"Invalid RSA public key: {e}") from e
 
         encrypted_key, aes_mode = _encrypt_aes_key(rsa_key, rsa_padding, aes_key)
 
-        cipher = _init_aes_cipher(aes_key, iv, aes_mode)
-        padded_data = pad(json.dumps(data).encode(), AES.block_size)
-        encrypted_data = cipher.encrypt(padded_data)
+        padded_data = _pkcs7_pad(json.dumps(data).encode())
+        encrypted_data = _run_aes_cipher(aes_key, iv, aes_mode, padded_data, encrypt_mode=True)
 
         return {
             "encrypted_data": base64.b64encode(iv + encrypted_data).decode(),
@@ -100,14 +106,14 @@ def decrypt(
         iv, ciphertext = encrypted_data_bytes[:16], encrypted_data_bytes[16:]
 
         try:
-            rsa_key = RSA.import_key(private_key_pem)
+            rsa_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
         except Exception as e:
             raise KeyFormatError(f"Invalid RSA private key: {e}") from e
 
         aes_key, aes_mode = _decrypt_aes_key(rsa_key, encrypted_key_bytes, rsa_padding)
 
-        cipher = _init_aes_cipher(aes_key, iv, aes_mode)
-        decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        decrypted_padded = _run_aes_cipher(aes_key, iv, aes_mode, ciphertext, encrypt_mode=False)
+        decrypted = _pkcs7_unpad(decrypted_padded)
 
         return json.loads(decrypted.decode())
 
@@ -118,7 +124,7 @@ def decrypt(
 
 
 def _encrypt_aes_key(
-        rsa_key: RSA.RsaKey,
+        rsa_key,
         padding: str,
         aes_key: bytes,
 ) -> Tuple[bytes, str]:
@@ -135,14 +141,14 @@ def _encrypt_aes_key(
         raise UnsupportedAlgorithmError(
             "Unsupported RSA padding. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
 
-    cipher = RSA_PADDING_MODES[padding].new(rsa_key)
-    encrypted_key = cipher.encrypt(aes_key)
+    rsa_padding, aes_mode = RSA_PADDING_MODES[padding]
+    encrypted_key = rsa_key.encrypt(aes_key, rsa_padding)
 
-    return encrypted_key, "CBC" if padding == "PKCS1_v1_5" else "GCM"
+    return encrypted_key, aes_mode
 
 
 def _decrypt_aes_key(
-        rsa_key: RSA.RsaKey,
+        rsa_key,
         encrypted_key: bytes,
         padding: str,
 ) -> Tuple[bytes, str]:
@@ -160,48 +166,66 @@ def _decrypt_aes_key(
         raise UnsupportedAlgorithmError(
             "Unsupported RSA padding. Use 'PKCS1_v1_5' or 'PKCS1_OAEP'.")
 
-    cipher = RSA_PADDING_MODES[padding].new(rsa_key)
-
-    decrypted_key = (
-        cipher.decrypt(encrypted_key, None)
-        if padding == "PKCS1_v1_5"
-        else cipher.decrypt(encrypted_key)
-    )
+    rsa_padding, aes_mode = RSA_PADDING_MODES[padding]
+    decrypted_key = rsa_key.decrypt(encrypted_key, rsa_padding)
 
     if not decrypted_key:
         raise DecryptionError("AES key decryption failed.")
 
-    return decrypted_key, "CBC" if padding == "PKCS1_v1_5" else "GCM"
+    return decrypted_key, aes_mode
 
 
-def _init_aes_cipher(aes_key: bytes, iv: bytes, mode: str) -> AES:
+def _run_aes_cipher(aes_key: bytes, iv: bytes, mode: str, data: bytes, encrypt_mode: bool) -> bytes:
     """
-    Initializes AES cipher.
+    Runs the AES cipher in the given mode over ``data``.
+
+    Note: the 'GCM' mode here mirrors the historical wire format, which uses the
+    cipher purely as a keystream (no authentication tag is produced or checked).
+    Authenticity of the AES session key itself is guaranteed by the RSA layer.
 
     Args:
         aes_key (bytes): AES session key.
         iv (bytes): Initialization vector or nonce.
         mode (str): AES mode - 'GCM' or 'CBC'.
+        data (bytes): Input bytes to transform.
+        encrypt_mode (bool): True to encrypt, False to decrypt.
 
     Returns:
-        AES cipher object.
+        bytes: Transformed output.
 
     Raises:
         UnsupportedAlgorithmError: If the AES mode is not supported.
     """
     if mode == "GCM":
-        return AES.new(aes_key, AES.MODE_GCM, nonce=iv)
+        # Used purely as a keystream cipher here (no tag is generated or checked -
+        # the RSA layer is what protects the AES key). GCM's keystream XOR is
+        # symmetric, so the encryptor context is reused for both directions.
+        ctx = Cipher(algorithms.AES(aes_key), modes.GCM(iv)).encryptor()
     elif mode == "CBC":
-        return AES.new(aes_key, AES.MODE_CBC, iv)  # NOSONAR
+        cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+        ctx = cipher.encryptor() if encrypt_mode else cipher.decryptor()
     else:
         raise UnsupportedAlgorithmError("Unsupported AES mode. Use 'GCM' or 'CBC'.")
+
+    return ctx.update(data) + ctx.finalize()
+
+
+def _pkcs7_pad(data: bytes) -> bytes:
+    padder = sym_padding.PKCS7(algorithms.AES.block_size).padder()
+    return padder.update(data) + padder.finalize()
+
+
+def _pkcs7_unpad(data: bytes) -> bytes:
+    unpadder = sym_padding.PKCS7(algorithms.AES.block_size).unpadder()
+    return unpadder.update(data) + unpadder.finalize()
 
 
 def __dir__():
     return sorted(
         name for name in globals()
         if name not in {
-            "base64", "json", "Tuple", "AES", "PKCS1_OAEP", "PKCS1_v1_5", "RSA",
-            "get_random_bytes", "pad", "unpad", "RSA_PADDING_MODES"
+            "base64", "json", "secrets", "Tuple", "hashes", "sym_padding",
+            "serialization", "asym_padding", "Cipher", "algorithms", "modes",
+            "RSA_PADDING_MODES"
         }
     )

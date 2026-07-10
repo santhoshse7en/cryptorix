@@ -3,8 +3,14 @@ import os
 from base64 import b64decode, b64encode
 from typing import Union
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+try:
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+except ImportError as e:
+    raise ImportError(
+        "Cryptorix.kms requires the 'aws' extra. Install it with: "
+        "pip install cryptorix[aws]"
+    ) from e
 
 from .exceptions import EncryptionError, DecryptionError
 
@@ -12,7 +18,14 @@ __all__ = ["encrypt", "decrypt"]
 
 # Set default AWS region
 REGION_NAME = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-kms_client = boto3.client("kms", region_name=REGION_NAME)
+_kms_client = None
+
+
+def _get_client():
+    global _kms_client
+    if _kms_client is None:
+        _kms_client = boto3.client("kms", region_name=REGION_NAME)
+    return _kms_client
 
 
 def encrypt(plaintext: str, kms_key_id: str) -> str:
@@ -30,7 +43,7 @@ def encrypt(plaintext: str, kms_key_id: str) -> str:
         EncryptionError: If encryption fails.
     """
     try:
-        response = kms_client.encrypt(
+        response = _get_client().encrypt(
             KeyId=kms_key_id,
             Plaintext=plaintext.encode("utf-8")
         )
@@ -54,7 +67,7 @@ def decrypt(ciphertext_b64: str) -> Union[str, dict]:
         DecryptionError: If decryption fails.
     """
     try:
-        decrypted_response = kms_client.decrypt(
+        decrypted_response = _get_client().decrypt(
             CiphertextBlob=b64decode(ciphertext_b64)
         )
         plaintext = decrypted_response["Plaintext"].decode("utf-8")
@@ -68,6 +81,6 @@ def __dir__():
         name for name in globals()
         if name not in {
             "b64decode", "b64encode", "boto3", "Union", "json", "os",
-            "BotoCoreError", "ClientError", "REGION_NAME", "kms_client"
+            "BotoCoreError", "ClientError", "REGION_NAME", "_kms_client", "_get_client"
         }
     )
